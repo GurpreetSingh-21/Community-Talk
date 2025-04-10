@@ -1,11 +1,9 @@
-// useState for form and error
+// Registration.js
 import { useState } from 'react'
-// for go login page
 import { Link } from 'react-router-dom'
+import axios from 'axios'
 
-// Registration page start
 function Registration({ onRegister }) {
-  // for storing form values
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -13,10 +11,9 @@ function Registration({ onRegister }) {
     confirmPassword: ''
   })
 
-  // for storing error messages
   const [errors, setErrors] = useState({})
 
-  // when user type something
+  // Triggered when any input value changes.
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData({
@@ -24,7 +21,7 @@ function Registration({ onRegister }) {
       [name]: value
     })
 
-    // remove error if user start typing again
+    // Remove error for the field if the user starts typing again.
     if (errors[name]) {
       setErrors({
         ...errors,
@@ -33,30 +30,30 @@ function Registration({ onRegister }) {
     }
   }
 
-  // check form valid or not
+  // Validate the form and update error state.
   const validateForm = () => {
     const newErrors = {}
 
-    // name check
+    // Full name check.
     if (!formData.fullName) {
       newErrors.fullName = 'Full name is required'
     }
 
-    // email check
+    // Email check.
     if (!formData.email) {
       newErrors.email = 'Email is required'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid'
     }
 
-    // password check
+    // Password check.
     if (!formData.password) {
       newErrors.password = 'Password is required'
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters'
     }
 
-    // confirm password check
+    // Confirm password check.
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password'
     } else if (formData.password !== formData.confirmPassword) {
@@ -67,14 +64,26 @@ function Registration({ onRegister }) {
     return Object.keys(newErrors).length === 0
   }
 
-  // when form submit
-  const handleSubmit = (e) => {
+  // Handle form submission.
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (validateForm()) {
-      // we not need confirmPassword for backend
-      const { confirmPassword, ...registrationData } = formData
-      onRegister(registrationData)
+    // Validate form first.
+    if (!validateForm()) {
+      return
+    }
+    
+    // Remove confirmPassword before submission.
+    const { confirmPassword, ...payload } = formData
+
+    try {
+      // Endpoint changed to '/register' to match backend.
+      await axios.post('http://localhost:3000/register', formData)
+      alert("Registration successful!")
+      if (onRegister) onRegister()
+    } catch (error) {
+      console.error(error)
+      alert("Something went wrong")
     }
   }
 
@@ -101,7 +110,6 @@ function Registration({ onRegister }) {
             {errors.fullName && <p className="error-message">{errors.fullName}</p>}
           </div>
 
-          {/* email input */}
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -116,7 +124,6 @@ function Registration({ onRegister }) {
             {errors.email && <p className="error-message">{errors.email}</p>}
           </div>
 
-          {/* password input */}
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
@@ -131,7 +138,6 @@ function Registration({ onRegister }) {
             {errors.password && <p className="error-message">{errors.password}</p>}
           </div>
 
-          {/* confirm password input */}
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password</label>
             <input
@@ -146,18 +152,18 @@ function Registration({ onRegister }) {
             {errors.confirmPassword && <p className="error-message">{errors.confirmPassword}</p>}
           </div>
 
-          {/* submit button */}
           <button type="submit" className="auth-button">Create Account</button>
         </form>
 
-        {/* login link */}
         <div className="auth-footer">
-          <p>Already have an account? <Link to="/login" className="auth-link">Log in</Link></p>
+          <p>
+            Already have an account?{' '}
+            <Link to="/login" className="auth-link">Log in</Link>
+          </p>
         </div>
       </div>
     </div>
   )
 }
 
-// export this page
 export default Registration
