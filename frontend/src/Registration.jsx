@@ -13,7 +13,6 @@ function Registration({ onRegister }) {
 
   const [errors, setErrors] = useState({})
 
-  // Triggered when any input value changes.
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData({
@@ -21,7 +20,6 @@ function Registration({ onRegister }) {
       [name]: value
     })
 
-    // Remove error for the field if the user starts typing again.
     if (errors[name]) {
       setErrors({
         ...errors,
@@ -30,30 +28,25 @@ function Registration({ onRegister }) {
     }
   }
 
-  // Validate the form and update error state.
   const validateForm = () => {
     const newErrors = {}
 
-    // Full name check.
     if (!formData.fullName) {
       newErrors.fullName = 'Full name is required'
     }
 
-    // Email check.
     if (!formData.email) {
       newErrors.email = 'Email is required'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid'
     }
 
-    // Password check.
     if (!formData.password) {
       newErrors.password = 'Password is required'
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters'
     }
 
-    // Confirm password check.
     if (!formData.confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password'
     } else if (formData.password !== formData.confirmPassword) {
@@ -64,26 +57,22 @@ function Registration({ onRegister }) {
     return Object.keys(newErrors).length === 0
   }
 
-  // Handle form submission.
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    // Validate form first.
     if (!validateForm()) {
       return
     }
-    
-    // Remove confirmPassword before submission.
+
     const { confirmPassword, ...payload } = formData
 
     try {
-      // Endpoint changed to '/register' to match backend.
-      await axios.post('http://localhost:3000/register', formData)
+      await axios.post('http://localhost:3000/register', payload)
       alert("Registration successful!")
       if (onRegister) onRegister()
     } catch (error) {
       console.error(error)
-      alert("Something went wrong")
+      alert(error.response?.data?.error || "Something went wrong")
     }
   }
 

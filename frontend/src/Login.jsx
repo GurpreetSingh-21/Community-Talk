@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-
+import axios from 'axios'
 function Login({ onLogin }) {
   const [formData, setFormData] = useState({
     email: '',
@@ -44,13 +44,20 @@ function Login({ onLogin }) {
     return Object.keys(newErrors).length === 0
   }
   
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    
-    if (validateForm()) {
-      onLogin(formData)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+  
+    if (!validateForm()) return;
+  
+    try {
+      const res = await axios.post('http://localhost:3000/login', formData);
+      alert("Login successful!");
+      if (onLogin) onLogin(res.data.user);
+    } catch (error) {
+      console.error(error);
+      alert(error.response?.data?.error || "Something went wrong");
     }
-  }
+  };
 
   return (
     <div className="auth-container">
