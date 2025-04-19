@@ -5,6 +5,7 @@ import './App.css'
 import Home from './Home'
 import Login from './Login'
 import Registration from './Registration'
+import ForgotPassword from './ForgotPassword'
 
 function App() {
   // check user login or not
@@ -41,30 +42,33 @@ function App() {
       <div className="app-container">
         <Routes>
           {/* if login ok, go home. if not, go login page */}
-          <Route 
-            path="/" 
-            element={isAuthenticated ? 
-              <Home onLogout={handleLogout} /> : 
+          <Route
+            path="/"
+            element={isAuthenticated ?
+              <Home onLogout={handleLogout} /> :
               <Navigate to="/login" />
-            } 
+            }
           />
-          
+
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+
+
           {/* if not login, show login. if already login, go home */}
-          <Route 
-            path="/login" 
-            element={!isAuthenticated ? 
-              <Login onLogin={handleLogin} /> : 
+          <Route
+            path="/login"
+            element={!isAuthenticated ?
+              <Login onLogin={handleLogin} /> :
               <Navigate to="/" />
-            } 
+            }
           />
-          
+
           {/* if not login, show register. if already login, go home */}
-          <Route 
-            path="/register" 
-            element={!isAuthenticated ? 
-              <Registration onRegister={handleRegistration} /> : 
+          <Route
+            path="/register"
+            element={!isAuthenticated ?
+              <Registration onRegister={handleRegistration} /> :
               <Navigate to="/" />
-            } 
+            }
           />
         </Routes>
       </div>

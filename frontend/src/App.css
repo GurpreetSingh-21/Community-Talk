@@ -603,21 +603,35 @@ textarea:focus {
   cursor: pointer;
 }
 
-/* Show hamburger icon on mobile */
+
+
+.forgot-password {
+  color: var(--primary-color);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  margin-left: auto;
+}
+
+.forgot-password:hover {
+  color: var(--primary-dark);
+}
+
+
+
+
+
 @media (max-width: 768px) {
   .hamburger-btn {
     display: inline;
   }
 }
 
-/* Hide members sidebar on tablet & smaller */
 @media (max-width: 1024px) {
   .members-sidebar {
     display: none;
   }
 }
 
-/* Responsive sidebar toggle for mobile */
 @media (max-width: 768px) {
   .sidebar {
     display: none;
@@ -681,7 +695,6 @@ textarea:focus {
 
 }
 
-/* Hide sidebars completely on very small screens */
 @media (max-width: 600px) {
   .sidebar,
   .members-sidebar {
