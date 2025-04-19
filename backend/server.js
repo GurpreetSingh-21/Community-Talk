@@ -6,18 +6,19 @@ const app = express();
 const db = require("./db");
 
 // Step 3: Create schema
-const Person = require("./person");
 
 // Use express JSON parser (or body-parser)
 app.use(express.json());
 
+require('dotenv').config();
+const port = process.env.port || 3000;
 // Set CORS to allow requests from http://localhost:5173
 app.use(
   cors({
     origin: "http://localhost:5174",
   })
 );
- 
+
 // Registration endpoint
 app.post("/register", async (req, res) => {
   const { fullName, email, password } = req.body;
