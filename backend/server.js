@@ -17,7 +17,7 @@ app.use(
     origin: "http://localhost:5174",
   })
 );
-
+ 
 // Registration endpoint
 app.post("/register", async (req, res) => {
   const { fullName, email, password } = req.body;
