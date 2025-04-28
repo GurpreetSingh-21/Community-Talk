@@ -8,7 +8,7 @@ import Registration from './Registration'
 
 function App() {
   // check user login or not
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(true)
 
   // when user login
   const handleLogin = (userData) => {

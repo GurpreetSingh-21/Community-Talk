@@ -51,8 +51,13 @@ function Login({ onLogin }) {
   
     try {
       const res = await axios.post('http://localhost:3000/login', formData);
+      const token = res.data.token; // 🎯 get the token from response
+  
+      // Save token in localStorage
+      localStorage.setItem('token', token);
+  
       alert("Login successful!");
-      if (onLogin) onLogin(res.data.user);
+      if (onLogin) onLogin(token); // send token instead of user
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.error || "Something went wrong");
