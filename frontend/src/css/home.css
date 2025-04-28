@@ -1,220 +1,11 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-:root {
-  --primary-color: #4f46e5;
-  --primary-light: #6366f1;
-  --primary-dark: #4338ca;
-  --secondary-color: #f9fafb;
-  --text-color: #111827;
-  --text-secondary: #6b7280;
-  --text-light: #9ca3af;
-  --border-color: #e5e7eb;
-  --error-color: #ef4444;
-  --success-color: #10b981;
-  --online-color: #10b981;
-  --offline-color: #9ca3af;
-  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-
-  font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-html,
-body {
-  height: 100%;
-  width: 100%;
-}
-
-#root {
-  height: 100%;
-  width: 100%;
-}
-
-body {
-  background-color: #f3f4f6;
-  color: var(--text-color);
-}
-
-a {
-  color: var(--primary-color);
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-button {
-  cursor: pointer;
-  border: none;
-  background: none;
-  font-size: 1rem;
-}
-
-input,
-textarea {
-  border: 1px solid var(--border-color);
-  border-radius: 0.375rem;
-  padding: 0.625rem;
-  font-size: 0.875rem;
-  width: 100%;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-input:focus,
-textarea:focus {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
-}
-
-/* App Container */
-.app-container {
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden;
-}
-
-/* Authentication Pages */
-.auth-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 1.25rem;
-  background-color: #f3f4f6;
-}
-
-.auth-card {
-  background-color: white;
-  border-radius: 0.5rem;
-  box-shadow: var(--card-shadow);
-  width: 100%;
-  max-width: 28rem;
-  padding: 2rem;
-}
-
-.auth-header {
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.auth-header h1 {
-  color: var(--primary-color);
-  font-size: 1.875rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.auth-header p {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-}
-
-.auth-form .form-group {
-  margin-bottom: 1.25rem;
-}
-
-.auth-form label {
-  display: block;
-  margin-bottom: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-color);
-}
-
-.auth-form input.error {
-  border-color: var(--error-color);
-}
-
-.error-message {
-  color: var(--error-color);
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
-}
-
-.form-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  font-size: 0.75rem;
-}
-
-.remember-me {
-  display: flex;
-  align-items: center;
-}
-
-.remember-me input {
-  margin-right: 0.375rem;
-  width: auto;
-}
-
-.forgot-password {
-  color: var(--primary-color);
-}
-
-.terms-agreement {
-  display: flex;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-  font-size: 0.75rem;
-}
-
-.terms-agreement input {
-  margin-right: 0.375rem;
-  margin-top: 0.25rem;
-  width: auto;
-}
-
-.terms-link {
-  color: var(--primary-color);
-}
-
-.auth-button {
-  width: 100%;
-  padding: 0.625rem;
-  background-color: var(--primary-color);
-  color: white;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.auth-button:hover {
-  background-color: var(--primary-dark);
-}
-
-.auth-footer {
-  text-align: center;
-  margin-top: 1.5rem;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.auth-link {
-  color: var(--primary-color);
-  font-weight: 500;
-}
-
-/* Home Page */
+/* ===== Home Page Layout ===== */
 .home-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
 }
 
+/* ===== Header ===== */
 .header {
   display: flex;
   align-items: center;
@@ -249,6 +40,7 @@ textarea:focus {
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* ===== User Controls (Notification + Avatar) ===== */
 .user-controls {
   display: flex;
   align-items: center;
@@ -279,12 +71,14 @@ textarea:focus {
   object-fit: cover;
 }
 
+/* ===== Main Content Layout ===== */
 .main-content {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
+/* ===== Sidebar (Communities List) ===== */
 .sidebar {
   width: 15rem;
   background-color: #f9fafb;
@@ -326,6 +120,7 @@ textarea:focus {
 
 .community-item {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0.375rem;
   border-radius: 0.25rem;
@@ -356,6 +151,30 @@ textarea:focus {
   background-color: var(--primary-color);
 }
 
+/* Community left (dot + name) */
+.community-left {
+  display: flex;
+  align-items: center;
+}
+
+/* Community options (dotted button) */
+.community-options {
+  margin-left: auto;
+}
+
+.options-btn {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.options-btn:hover {
+  color: var(--primary-color);
+}
+
+/* ===== Current User at Bottom of Sidebar ===== */
 .current-user {
   display: flex;
   align-items: center;
@@ -387,6 +206,7 @@ textarea:focus {
   color: var(--online-color);
 }
 
+/* ===== Chat Area ===== */
 .chat-area {
   flex: 1;
   display: flex;
@@ -433,6 +253,7 @@ textarea:focus {
   background-color: var(--border-color);
 }
 
+/* ===== Messages Area ===== */
 .messages-container {
   flex: 1;
   padding: 1rem;
@@ -484,6 +305,7 @@ textarea:focus {
   line-height: 1.5;
 }
 
+/* ===== Message Input ===== */
 .message-input-container {
   display: flex;
   align-items: center;
@@ -529,6 +351,7 @@ textarea:focus {
   justify-content: center;
 }
 
+/* ===== Members Sidebar ===== */
 .members-sidebar {
   width: 16rem;
   border-left: 1px solid var(--border-color);
@@ -592,7 +415,7 @@ textarea:focus {
   color: var(--offline-color);
 }
 
-
+/* ===== Hamburger (Mobile Menu) ===== */
 .hamburger-btn {
   font-size: 1.25rem;
   background: none;
@@ -603,129 +426,20 @@ textarea:focus {
   cursor: pointer;
 }
 
-/* Show hamburger icon on mobile */
-@media (max-width: 768px) {
-  .hamburger-btn {
-    display: inline;
-  }
+
+
+.community-options {
+  margin-left: auto;
 }
 
-/* Hide members sidebar on tablet & smaller */
-@media (max-width: 1024px) {
-  .members-sidebar {
-    display: none;
-  }
+.options-btn {
+  font-size: 1.25rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 
-/* Responsive sidebar toggle for mobile */
-@media (max-width: 768px) {
-  .sidebar {
-    display: none;
-  }
-
-  .sidebar.active {
-    display: flex;
-    flex-direction: column;
-    width: 10rem;
-    padding: 0.5rem;
-    background-color: #f9fafb;
-    border-right: 1px solid var(--border-color);
-  }
-
-  .new-community-btn {
-    background-color: var(--primary-color);
-    color: white;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    margin-bottom: 1.5rem;
-    width: 100%;
-    text-align: center;
-  }
-
-  .new-community-btn:hover {
-    background-color: var(--primary-dark);
-  }
-
-  .community-item {
-    justify-content: flex-start;
-  }
-
-  .current-user {
-    justify-content: center;
-  }
-
-  .current-user .user-avatar {
-    margin-right: 0;
-  }
-
-  .auth-button,
-  .send-btn {
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
-  }
-
-  .community-info h2 {
-    font-size: 1rem;
-  }
-
-  .member-count {
-    font-size: 0.75rem;
-  }
-
-  .chat-controls .control-btn {
-    width: 1.75rem;
-    height: 1.75rem;
-  }
-
-}
-
-/* Hide sidebars completely on very small screens */
-@media (max-width: 600px) {
-  .sidebar,
-  .members-sidebar {
-    display: none;
-  }
-
-  .chat-area {
-    width: 100%;
-  }
-}
-
-/* Extra small tweaks for mobile layout */
-@media (max-width: 480px) {
-  html {
-    font-size: 85%;
-  }
-
-  .header {
-    flex-wrap: wrap;
-  }
-
-  .search-container {
-    display: none;
-  }
-
-  .chat-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
-  .message-input-container {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-
-  .message-input {
-    margin: 0;
-  }
-
-  .emoji-btn,
-  .attachment-btn,
-  .send-btn {
-    align-self: flex-end;
-  }
+.options-btn:hover {
+  color: var(--error-color);
 }

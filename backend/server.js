@@ -3,6 +3,11 @@ const cors = require("cors"); // import cors
 const app = express();
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
+const communityRoutes = require('./routes/communityRoutes');
+const memberRoutes = require('./routes/memberRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+
+
 // Step 2: Create database connection
 const db = require("./db");
 
@@ -40,6 +45,9 @@ app.get('/', LocalAuthMiddleware,function(req, res){
 
 const personRoutes = require('./routes/loginNregRoutes')
 app.use('/',personRoutes);
+app.use('/api/communities', communityRoutes);
+app.use('/api/members', memberRoutes);
+app.use('/api/messages', messageRoutes);
 
 
 

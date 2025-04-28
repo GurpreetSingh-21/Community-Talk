@@ -1,0 +1,127 @@
+/* ===== Responsive Tweaks ===== */
+
+/* Show hamburger icon on mobile */
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: inline;
+  }
+}
+
+/* Hide members sidebar on tablet and smaller */
+@media (max-width: 1024px) {
+  .members-sidebar {
+    display: none;
+  }
+}
+
+/* Sidebar toggle for mobile */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+
+  .sidebar.active {
+    display: flex;
+    flex-direction: column;
+    width: 10rem;
+    padding: 0.5rem;
+    background-color: #f9fafb;
+    border-right: 1px solid var(--border-color);
+  }
+
+  .new-community-btn {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  .new-community-btn:hover {
+    background-color: var(--primary-dark);
+  }
+
+  .community-item {
+    justify-content: flex-start;
+  }
+
+  .current-user {
+    justify-content: center;
+  }
+
+  .current-user .user-avatar {
+    margin-right: 0;
+  }
+
+  .auth-button,
+  .send-btn {
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+
+  .community-info h2 {
+    font-size: 1rem;
+  }
+
+  .member-count {
+    font-size: 0.75rem;
+  }
+
+  .chat-controls .control-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+}
+
+/* Hide sidebars completely on very small screens */
+@media (max-width: 600px) {
+  .sidebar,
+  .members-sidebar {
+    display: none;
+  }
+
+  .chat-area {
+    width: 100%;
+  }
+}
+
+/* Extra small tweaks for mobile */
+@media (max-width: 480px) {
+  html {
+    font-size: 85%;
+  }
+
+  .header {
+    flex-wrap: wrap;
+  }
+
+  .search-container {
+    display: none;
+  }
+
+  .chat-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .message-input-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .message-input {
+    margin: 0;
+  }
+
+  .emoji-btn,
+  .attachment-btn,
+  .send-btn {
+    align-self: flex-end;
+  }
+}

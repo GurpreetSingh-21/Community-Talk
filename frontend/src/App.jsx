@@ -1,10 +1,15 @@
 
 import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import './App.css'
 import Home from './Home'
 import Login from './Login'
 import Registration from './Registration'
+
+import './css/global.css';
+import './css/auth.css';
+import './css/home.css';
+import './css/responsive.css';
+
 
 function App() {
   // check user login or not
