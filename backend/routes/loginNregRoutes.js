@@ -47,7 +47,7 @@ router.post("/register", async (req, res) => {
       return res.status(401).json({ error: "Invalid password" });
     }
     const token = jwt.sign(
-      { id: user._id, email: user.email }, 
+      { id: user._id, email: user.email, fullName: user.fullName }, 
       process.env.MY_SECRET_KEY, 
       { expiresIn: '1h' }
     );

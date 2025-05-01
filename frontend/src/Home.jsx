@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import DeleteModal from './components/DeleteModal';
+import { jwtDecode } from 'jwt-decode';
+
 
 
 function Home({ onLogout }) {
@@ -16,6 +18,15 @@ function Home({ onLogout }) {
   const [communityToDelete, setCommunityToDelete] = useState(null);
   
 
+  const [userName, setUserName] = useState("");
+
+useEffect(() => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    const decoded = jwtDecode(token);
+    setUserName(decoded.fullName || decoded.username || decoded.email || "User");
+  }
+}, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -256,7 +267,7 @@ function Home({ onLogout }) {
               <img src="/chawa.jpeg" alt="User avatar" />
             </div>
             <div className="user-info">
-              <div className="user-name">Chawa</div>
+              <div className="user-name">{userName}</div>
               <div className="user-status online">Online</div>
             </div>
           </div>
