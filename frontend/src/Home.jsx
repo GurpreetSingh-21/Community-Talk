@@ -1,223 +1,204 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import DeleteModal from './components/DeleteModal';
-import { jwtDecode } from 'jwt-decode';
-
-
+import { jwtDecode } from "jwt-decode";
+import DeleteModal from "./components/DeleteModal";
 
 function Home({ onLogout }) {
+  // 🔐 User Info
+  const [userName, setUserName] = useState("");
+
+  // 📦 Data
   const [communities, setCommunities] = useState([]);
   const [currentCommunity, setCurrentCommunity] = useState(null);
   const [messages, setMessages] = useState([]);
   const [members, setMembers] = useState([]);
+
+  // 💬 UI State
   const [newMessage, setNewMessage] = useState("");
   const [showSidebar, setShowSidebar] = useState(true);
   const [showMembers, setShowMembers] = useState(window.innerWidth > 1024);
-  const [selectedCommunityForOptions, setSelectedCommunityForOptions] = useState(null);
+  const [isSwitchingCommunity, setIsSwitchingCommunity] = useState(false);
+
+  // ⚙️ Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [communityToDelete, setCommunityToDelete] = useState(null);
-  
 
-  const [userName, setUserName] = useState("");
-
-useEffect(() => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    const decoded = jwtDecode(token);
-    setUserName(decoded.fullName || decoded.username || decoded.email || "User");
-  }
-}, []);
-
+  // ✅ Decode Token
   useEffect(() => {
-    const handleResize = () => {
-      setShowMembers(window.innerWidth > 1024);
-    };
+    const token = localStorage.getItem("token");
+    if (token) {
+      const decoded = jwtDecode(token);
+      setUserName(decoded.fullName || decoded.username || decoded.email || "User");
+    }
+  }, []);
+
+  // 📏 Responsive Member Sidebar
+  useEffect(() => {
+    const handleResize = () => setShowMembers(window.innerWidth > 1024);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // 🌐 Fetch Communities
   useEffect(() => {
     const fetchCommunities = async () => {
       try {
-        const token = localStorage.getItem('token'); 
-        const res = await axios.get('http://localhost:3000/api/communities', {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://localhost:3000/api/communities", {
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        const fixedCommunities = res.data.map(c => ({
-          id: c._id,
-          name: c.name,
+        const fixed = res.data.map(c => ({
+          id: c._id || c.id,
+          name: c.name || "Untitled",
           active: false
         }));
 
-        setCommunities(fixedCommunities);
-        setCurrentCommunity(fixedCommunities[0] || null);
-      } catch (error) {
-        console.error('Error fetching communities:', error);
+        setCommunities(fixed);
+        if (fixed.length > 0) selectCommunity(fixed[0]);
+      } catch (err) {
+        console.error("Error fetching communities:", err);
       }
     };
-
     fetchCommunities();
   }, []);
 
+  // 🖱 Select Community
+  const selectCommunity = async (community) => {
+    if (!community?.id || isSwitchingCommunity) return;
+    setIsSwitchingCommunity(true);
+
+    setCurrentCommunity(community);
+    setCommunities(prev =>
+      prev.map(c => ({ ...c, active: c.id === community.id }))
+    );
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const [messagesRes, membersRes] = await Promise.all([
+        axios.get(`http://localhost:3000/api/messages/${community.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`http://localhost:3000/api/members/${community.id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      setMessages(messagesRes.data);
+      setMembers(membersRes.data);
+
+      setTimeout(() => {
+        document.querySelector(".messages-container")?.scrollTo(0, 9999);
+      }, 50);
+    } catch (err) {
+      console.error("Error loading community data:", err);
+      setMessages([]);
+      setMembers([]);
+    } finally {
+      setIsSwitchingCommunity(false);
+    }
+  };
+
+  // ➕ New Community
   const handleNewCommunity = async () => {
-    const communityName = prompt("Enter community name:");
-    if (!communityName) return;
+    const name = prompt("Enter community name:");
+    if (!name) return;
 
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post(
         "http://localhost:3000/api/communities",
-        { name: communityName },
-        { headers: { Authorization: `Bearer ${token}` }
-      });
+        { name },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-      const newCommunity = {
+      const newC = {
         id: res.data._id,
         name: res.data.name,
-        active: true,
+        active: true
       };
 
-      setCommunities(prev => [...prev.map(c => ({ ...c, active: false })), newCommunity]);
-      setCurrentCommunity(newCommunity);
+      setCommunities(prev => prev.map(c => ({ ...c, active: false })).concat(newC));
+      setCurrentCommunity(newC);
       setMessages([]);
       setMembers([]);
-    } catch (error) {
-      console.error("Error creating community:", error);
-      alert(error.response?.data?.error || "Something went wrong");
+    } catch (err) {
+      console.error("Error creating community:", err);
+      alert(err.response?.data?.error || "Something went wrong");
     }
   };
 
-  const selectCommunity = async (community) => {
-    setCurrentCommunity(community);
-
-    const updatedCommunities = communities.map((c) => ({
-      ...c,
-      active: c.id === community.id,
-    }));
-    setCommunities(updatedCommunities);
-
-    try {
-      const token = localStorage.getItem('token');
-
-      const res = await axios.get(`http://localhost:3000/api/messages/${community.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setMessages(res.data);
-
-      const membersRes = await axios.get(`http://localhost:3000/api/members/${community.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setMembers(membersRes.data);
-
-    } catch (error) {
-      console.error('Error fetching community data:', error);
-      setMessages([]);
-      setMembers([]);
-    }
-  };
-
+  // 📤 Send Message
   const handleSendMessage = async (e) => {
     e.preventDefault();
-
-    if (!newMessage.trim() || !currentCommunity || !currentCommunity.id) {
-      alert("Please select a community and type a message.");
-      return;
-    }
-
-    const messageData = {
-      content: newMessage,
-      communityId: currentCommunity.id,
-    };
+    if (!newMessage.trim() || !currentCommunity?.id) return;
 
     try {
       const token = localStorage.getItem("token");
       await axios.post(
         "http://localhost:3000/api/messages",
-        messageData,
-        { headers: { Authorization: `Bearer ${token}` }
-      });
+        {
+          content: newMessage,
+          communityId: currentCommunity.id
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
       setNewMessage("");
 
       const res = await axios.get(`http://localhost:3000/api/messages/${currentCommunity.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+
       setMessages(res.data);
 
       setTimeout(() => {
-        const container = document.querySelector(".messages-container");
-        if (container) container.scrollTop = container.scrollHeight;
-      }, 100);
-
-    } catch (error) {
-      console.error("Error sending message:", error);
+        document.querySelector(".messages-container")?.scrollTo(0, 9999);
+      }, 50);
+    } catch (err) {
+      console.error("Error sending message:", err);
     }
   };
 
-  const handleOptionsClick = (community) => {
-    if (selectedCommunityForOptions && selectedCommunityForOptions.id === community.id) {
-      setSelectedCommunityForOptions(null);
-    } else {
-      setSelectedCommunityForOptions(community);
-    }
-  };
-
+  // 🗑 Delete Community
   const handleDeleteCommunity = async (communityId) => {
-    const confirmDelete = window.confirm("Are you sure you want to delete this community?");
-    if (!confirmDelete) return;
-  
+    if (!window.confirm("Are you sure you want to delete this community?")) return;
+
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       await axios.delete(`http://localhost:3000/api/communities/${communityId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-  
-      // After deletion, remove community from UI
-      const updatedCommunities = communities.filter((c) => c.id !== communityId);
-      setCommunities(updatedCommunities);
-  
-      // Reset current community if the deleted one was selected
-      if (currentCommunity && currentCommunity.id === communityId) {
-        setCurrentCommunity(updatedCommunities[0] || null);
+
+      const updated = communities.filter(c => c.id !== communityId);
+      setCommunities(updated);
+
+      if (currentCommunity?.id === communityId) {
+        setCurrentCommunity(updated[0] || null);
         setMessages([]);
         setMembers([]);
       }
-  
+
       alert("Community deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting community:", error);
-      alert(error.response?.data?.error || "Something went wrong");
+    } catch (err) {
+      console.error("Error deleting community:", err);
     }
   };
-  
+
   return (
     <div className="home-container">
-      {/* Header */}
+      {/* ==== HEADER ==== */}
       <header className="header">
         <div className="logo">
-          <button
-            className="hamburger-btn"
-            onClick={() => setShowSidebar(!showSidebar)}
-          >
-            ☰
-          </button>
+          <button className="hamburger-btn" onClick={() => setShowSidebar(!showSidebar)}>☰</button>
           Community Talk
         </div>
-
         <div className="search-container">
-          <input
-            type="text"
-            placeholder="Search communities..."
-            className="search-input"
-          />
+          <input type="text" className="search-input" placeholder="Search communities..." />
         </div>
-
         <div className="user-controls">
-          <button className="notification-btn">
-            <span className="notification-icon">🔔</span>
-          </button>
+          <button className="notification-btn">🔔</button>
           <div className="user-avatar" onClick={onLogout}>
             <img src="/chawa.jpeg" alt="User avatar" />
           </div>
@@ -225,47 +206,28 @@ useEffect(() => {
       </header>
 
       <div className="main-content">
-        {/* Sidebar */}
+        {/* ==== SIDEBAR ==== */}
         <aside className={`sidebar ${showSidebar ? "active" : ""}`}>
-          <button className="new-community-btn" onClick={handleNewCommunity}>
-            + New Community
-          </button>
-
+          <button className="new-community-btn" onClick={handleNewCommunity}>+ New Community</button>
           <div className="communities-list-header">YOUR COMMUNITIES</div>
-
           <ul className="communities-list">
-  {communities.length === 0 ? (
-    <p>Loading communities...</p>
-  ) : (
-    communities.map((community) => (
-      <li key={community.id} className={`community-item ${community.active ? "active" : ""}`}>
-        <div className="community-left" onClick={() => selectCommunity(community)}>
-          <span className={`status-dot ${community.active ? "active" : ""}`}></span>
-          {community.name}
-        </div>
-
-        <div className="community-options">
-        <button
-  className="options-btn"
-  onClick={() => {
-    setCommunityToDelete(community);
-    setShowDeleteModal(true);
-  }}
->
-  ⋮
-</button>
-
-        </div>
-      </li>
-    ))
-  )}
-</ul>
-
-
+            {communities.map((c, i) => (
+              <li key={c.id || i} className={`community-item ${c.active ? "active" : ""}`}>
+                <div className="community-left" onClick={() => selectCommunity(c)}>
+                  <span className={`status-dot ${c.active ? "active" : ""}`}></span>
+                  {c.name}
+                </div>
+                <div className="community-options">
+                  <button className="options-btn" onClick={() => {
+                    setCommunityToDelete(c);
+                    setShowDeleteModal(true);
+                  }}>⋮</button>
+                </div>
+              </li>
+            ))}
+          </ul>
           <div className="current-user">
-            <div className="user-avatar">
-              <img src="/chawa.jpeg" alt="User avatar" />
-            </div>
+            <div className="user-avatar"><img src="/chawa.jpeg" alt="User" /></div>
             <div className="user-info">
               <div className="user-name">{userName}</div>
               <div className="user-status online">Online</div>
@@ -273,35 +235,33 @@ useEffect(() => {
           </div>
         </aside>
 
-        {/* Chat Area */}
+        {/* ==== CHAT AREA ==== */}
         <main className="chat-area">
           <div className="chat-header">
             <div className="community-info">
-              <h2>{currentCommunity ? currentCommunity.name : "Select a Community"}</h2>
-              <span className="member-count">
-                {members.length} {members.length === 1 ? "member" : "members"}
-              </span>
+              <h2>{currentCommunity?.name || "Select a Community"}</h2>
+              <span className="member-count">{members.length} member{members.length !== 1 ? "s" : ""}</span>
             </div>
             <div className="chat-controls">
-              <button className="control-btn call">📞</button>
-              <button className="control-btn video">🎥</button>
-              <button className="control-btn settings">⚙️</button>
+              <button className="control-btn">📞</button>
+              <button className="control-btn">🎥</button>
+              <button className="control-btn">⚙️</button>
               <button className="control-btn" onClick={() => setShowMembers(!showMembers)}>👥</button>
             </div>
           </div>
 
           <div className="messages-container">
-            {messages.map((message) => (
-              <div key={message._id || message.id} className="message">
+            {messages.map(m => (
+              <div key={m._id || m.id} className="message">
                 <div className="message-avatar">
-                  <img src={message.avatar || "/default-avatar.png"} alt={`${message.sender || "User"} avatar`} />
+                  <img src={m.avatar || "/default-avatar.png"} alt="Sender" />
                 </div>
                 <div className="message-content">
                   <div className="message-header">
-                    <span className="sender-name">{message.sender}</span>
-                    <span className="timestamp">{message.timestamp}</span>
+                    <span className="sender-name">{m.sender}</span>
+                    <span className="timestamp">{m.timestamp}</span>
                   </div>
-                  <div className="message-text">{message.content}</div>
+                  <div className="message-text">{m.content}</div>
                 </div>
               </div>
             ))}
@@ -311,8 +271,8 @@ useEffect(() => {
             <button type="button" className="emoji-btn">😊</button>
             <input
               type="text"
-              placeholder="Type your message..."
               className="message-input"
+              placeholder="Type your message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
             />
@@ -321,7 +281,7 @@ useEffect(() => {
           </form>
         </main>
 
-        {/* Members Sidebar */}
+        {/* ==== MEMBERS SIDEBAR ==== */}
         {showMembers && (
           <aside className="members-sidebar">
             <h3>Community Members</h3>
@@ -329,16 +289,14 @@ useEffect(() => {
               {members.length === 0 ? (
                 <p>No members yet</p>
               ) : (
-                members.map((member) => (
-                  <li key={member._id || member.id} className="member-item">
+                members.map((m) => (
+                  <li key={m._id || m.id} className="member-item">
                     <div className="member-avatar">
-                      <img src={member.avatar || "/default-avatar.png"} alt={`${member.name} avatar`} />
+                      <img src={m.avatar || "/default-avatar.png"} alt={m.name} />
                     </div>
                     <div className="member-info">
-                      <div className="member-name">{member.name}</div>
-                      <div className={`member-status ${member.status}`}>
-                        {member.status}
-                      </div>
+                      <div className="member-name">{m.name}</div>
+                      <div className={`member-status ${m.status}`}>{m.status}</div>
                     </div>
                   </li>
                 ))
@@ -348,42 +306,16 @@ useEffect(() => {
         )}
       </div>
 
+      {/* ==== DELETE MODAL ==== */}
       <DeleteModal
-  show={showDeleteModal}
-  communityName={communityToDelete?.name}
-  onCancel={() => {
-    setShowDeleteModal(false);
-    setCommunityToDelete(null);
-  }}
-  onConfirm={async () => {
-    if (!communityToDelete) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3000/api/communities/${communityToDelete.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      const updatedCommunities = communities.filter((c) => c.id !== communityToDelete.id);
-      setCommunities(updatedCommunities);
-
-      if (currentCommunity && currentCommunity.id === communityToDelete.id) {
-        setCurrentCommunity(updatedCommunities[0] || null);
-        setMessages([]);
-        setMembers([]);
-      }
-
-      setShowDeleteModal(false);
-      setCommunityToDelete(null);
-
-      alert("Community deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting community:", error);
-      alert(error.response?.data?.error || "Something went wrong");
-    }
-  }}
-/>
-
+        show={showDeleteModal}
+        communityName={communityToDelete?.name}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setCommunityToDelete(null);
+        }}
+        onConfirm={() => handleDeleteCommunity(communityToDelete?.id)}
+      />
     </div>
   );
 }

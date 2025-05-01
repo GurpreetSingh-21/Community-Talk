@@ -1,57 +1,57 @@
+// 🌐 Core Modules
 const express = require("express");
-const cors = require("cors"); // import cors
+const cors = require("cors");
 const app = express();
+require('dotenv').config();
+
+// 🧠 Middleware and Auth
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
+const authenticate = require('./middleware/authenticate');
+
+
+// 🔌 Database
+const db = require("./db");
+
+// 📁 Route Files
+const personRoutes = require('./routes/loginNregRoutes');
 const communityRoutes = require('./routes/communityRoutes');
 const memberRoutes = require('./routes/memberRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 
-
-// Step 2: Create database connection
-const db = require("./db");
-
-// Step 3: Create schema
-
-// Use express JSON parser (or body-parser)
+// 🔧 Middleware Setup
 app.use(express.json());
-//middleware
 
+app.use(cors({
+  origin: "http://localhost:5173",
+}));
 
-//imlimenting middleware to let us know how many users came
-const logRequest = (req, res, next) =>{
-    console.log(`${new Date().toLocaleString()} Request made to : ${req.originalUrl}`);
-    next();
-  }
-app.use(logRequest)
-require('dotenv').config();
-const port = process.env.port || 3000;
-// Set CORS to allow requests from http://localhost:5173
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-  })
-);
-
+// 🛡 Passport
 app.use(passport.initialize());
-const LocalAuthMiddleware = passport.authenticate('local', {session:false});
+const LocalAuthMiddleware = passport.authenticate('local', { session: false });
+
+// 🧾 Request Logger
+app.use((req, res, next) => {
+  console.log(`${new Date().toLocaleString()} Request made to : ${req.originalUrl}`);
+  next();
+});
+
+// 🔐 Protected Routes
+app.use('/api/communities', authenticate, communityRoutes);
+app.use('/api/members', authenticate, memberRoutes);
+app.use('/api/messages', authenticate, messageRoutes);
 
 
+// 🔓 Public Routes
+app.use('/', personRoutes);
 
-app.get('/', LocalAuthMiddleware,function(req, res){
-    res.send('hi')
-})
-//using routers here of login and register pages
+// 🏠 Test Route
+app.get('/', LocalAuthMiddleware, (req, res) => {
+  res.send('hi');
+});
 
-const personRoutes = require('./routes/loginNregRoutes')
-app.use('/',personRoutes);
-app.use('/api/communities', communityRoutes);
-app.use('/api/members', memberRoutes);
-app.use('/api/messages', messageRoutes);
-
-
-
-
+// 🚀 Start Server
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log("Listening on port 3000");
+  console.log(`Listening on port ${port}`);
 });

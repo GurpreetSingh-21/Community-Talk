@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Community = require('../models/Community');
 
-// @route   POST /api/communities
-// @desc    Create a new community
+// 🔹 @route   POST /api/communities
+// 🔹 @desc    Create a new community
 router.post('/', async (req, res) => {
   try {
     const { name } = req.body;
@@ -13,7 +13,6 @@ router.post('/', async (req, res) => {
 
     const newCommunity = new Community({ name });
     const savedCommunity = await newCommunity.save();
-
     res.status(201).json(savedCommunity);
   } catch (error) {
     console.error(error);
@@ -24,10 +23,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// @route   GET /api/communities
-// @desc    Get all communities
+// 🔹 @route   GET /api/communities
+// 🔹 @desc    Get all communities
 router.get('/', async (req, res) => {
   try {
+    console.log("🔁 GET /api/communities called by:", req.user);
     const communities = await Community.find();
     res.status(200).json(communities);
   } catch (error) {
@@ -36,9 +36,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-
-// @route   DELETE /api/communities/:id
-// @desc    Delete a community by ID
+// 🔹 @route   DELETE /api/communities/:id
+// 🔹 @desc    Delete a community by ID
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -49,6 +48,5 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 
 module.exports = router;

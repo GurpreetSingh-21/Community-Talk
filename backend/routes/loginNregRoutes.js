@@ -1,5 +1,5 @@
 const express = require("express");
-const router = express();
+const router = express.Router();
 const Person = require('../person');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs'); // Add this at top
 
 router.post("/register", async (req, res) => {
   const { fullName, email, password } = req.body;
+  console.log("Login request body:", { email, password });
 
   try {
     // Hash the password first
@@ -77,4 +78,7 @@ router.post("/register", async (req, res) => {
   router.get("/profile", authenticate, (req, res) => {
     res.status(200).json({ message: "Welcome to your profile!", user: req.user });
   });
-module.exports = router;
+
+
+  module.exports = router;
+
