@@ -53,7 +53,7 @@ function Login({ onLogin }) {
       const res = await axios.post('http://localhost:3000/login', formData);
       const token = res.data.token; // 🎯 get the token from response
   
-      // Save token in localStorage
+     
       localStorage.setItem('token', token);
   
       alert("Login successful!");

@@ -13,7 +13,10 @@ import './css/responsive.css';
 
 function App() {
   // check user login or not
-  const [isAuthenticated, setIsAuthenticated] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return !!localStorage.getItem('token');
+  });
+  
 
   // when user login
   const handleLogin = (userData) => {
@@ -29,8 +32,10 @@ function App() {
 
   // when user click logout
   const handleLogout = () => {
-    setIsAuthenticated(false)
+    localStorage.removeItem('token');
+    setIsAuthenticated(false);
   }
+  
 
   // take users from localStorage or make default one
   const [users, setUsers] = useState(() => {
