@@ -2,28 +2,22 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import DeleteModal from "./components/DeleteModal";
+import { io } from "socket.io-client";
 
 function Home({ onLogout }) {
-  // 🔐 User Info
   const [userName, setUserName] = useState("");
-
-  // 📦 Data
   const [communities, setCommunities] = useState([]);
   const [currentCommunity, setCurrentCommunity] = useState(null);
   const [messages, setMessages] = useState([]);
   const [members, setMembers] = useState([]);
-
-  // 💬 UI State
   const [newMessage, setNewMessage] = useState("");
   const [showSidebar, setShowSidebar] = useState(true);
   const [showMembers, setShowMembers] = useState(window.innerWidth > 1024);
   const [isSwitchingCommunity, setIsSwitchingCommunity] = useState(false);
-
-  // ⚙️ Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [communityToDelete, setCommunityToDelete] = useState(null);
+  const [socket, setSocket] = useState(null);
 
-  // ✅ Decode Token
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -32,14 +26,12 @@ function Home({ onLogout }) {
     }
   }, []);
 
-  // 📏 Responsive Member Sidebar
   useEffect(() => {
     const handleResize = () => setShowMembers(window.innerWidth > 1024);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 🌐 Fetch Communities
   useEffect(() => {
     const fetchCommunities = async () => {
       try {
@@ -63,7 +55,23 @@ function Home({ onLogout }) {
     fetchCommunities();
   }, []);
 
-  // 🖱 Select Community
+  useEffect(() => {
+    const newSocket = io("http://localhost:3000");
+    setSocket(newSocket);
+
+    newSocket.on("receive_message", (data) => {
+      if (data.communityId === currentCommunity?.id) {
+        setMessages((prev) => [...prev, data]);
+
+        setTimeout(() => {
+          document.querySelector(".messages-container")?.scrollTo(0, 9999);
+        }, 50);
+      }
+    });
+
+    return () => newSocket.disconnect();
+  }, [currentCommunity]);
+
   const selectCommunity = async (community) => {
     if (!community?.id || isSwitchingCommunity) return;
     setIsSwitchingCommunity(true);
@@ -100,7 +108,6 @@ function Home({ onLogout }) {
     }
   };
 
-  // ➕ New Community
   const handleNewCommunity = async () => {
     const name = prompt("Enter community name:");
     if (!name) return;
@@ -129,7 +136,6 @@ function Home({ onLogout }) {
     }
   };
 
-  // 📤 Send Message
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !currentCommunity?.id) return;
@@ -145,23 +151,12 @@ function Home({ onLogout }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setNewMessage("");
-
-      const res = await axios.get(`http://localhost:3000/api/messages/${currentCommunity.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      setMessages(res.data);
-
-      setTimeout(() => {
-        document.querySelector(".messages-container")?.scrollTo(0, 9999);
-      }, 50);
+      setNewMessage(""); // message will appear via socket
     } catch (err) {
       console.error("Error sending message:", err);
     }
   };
 
-  // 🗑 Delete Community
   const handleDeleteCommunity = async (communityId) => {
     if (!window.confirm("Are you sure you want to delete this community?")) return;
 
@@ -188,7 +183,7 @@ function Home({ onLogout }) {
 
   return (
     <div className="home-container">
-      {/* ==== HEADER ==== */}
+      {/* HEADER */}
       <header className="header">
         <div className="logo">
           <button className="hamburger-btn" onClick={() => setShowSidebar(!showSidebar)}>☰</button>
@@ -206,7 +201,7 @@ function Home({ onLogout }) {
       </header>
 
       <div className="main-content">
-        {/* ==== SIDEBAR ==== */}
+        {/* SIDEBAR */}
         <aside className={`sidebar ${showSidebar ? "active" : ""}`}>
           <button className="new-community-btn" onClick={handleNewCommunity}>+ New Community</button>
           <div className="communities-list-header">YOUR COMMUNITIES</div>
@@ -235,7 +230,7 @@ function Home({ onLogout }) {
           </div>
         </aside>
 
-        {/* ==== CHAT AREA ==== */}
+        {/* CHAT AREA */}
         <main className="chat-area">
           <div className="chat-header">
             <div className="community-info">
@@ -281,7 +276,7 @@ function Home({ onLogout }) {
           </form>
         </main>
 
-        {/* ==== MEMBERS SIDEBAR ==== */}
+        {/* MEMBERS SIDEBAR */}
         {showMembers && (
           <aside className="members-sidebar">
             <h3>Community Members</h3>
@@ -306,7 +301,7 @@ function Home({ onLogout }) {
         )}
       </div>
 
-      {/* ==== DELETE MODAL ==== */}
+      {/* DELETE MODAL */}
       <DeleteModal
         show={showDeleteModal}
         communityName={communityToDelete?.name}
