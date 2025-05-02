@@ -27,8 +27,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173",
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 io.on("connection", (socket) => {
@@ -53,7 +53,9 @@ const LocalAuthMiddleware = passport.authenticate("local", { session: false });
 
 // 🧾 Logger
 app.use((req, res, next) => {
-  console.log(`${new Date().toLocaleString()} Request made to: ${req.originalUrl}`);
+  console.log(
+    `${new Date().toLocaleString()} Request made to: ${req.originalUrl}`
+  );
   next();
 });
 
