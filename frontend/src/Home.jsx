@@ -145,6 +145,7 @@ function Home({ onLogout }) {
       await axios.post(
         "http://localhost:3000/api/messages",
         {
+          sender:  userName,
           content: newMessage,
           communityId: currentCommunity.id
         },

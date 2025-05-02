@@ -6,14 +6,14 @@ const Message = require("../models/Message");
 // @desc    Create a new message
 router.post("/", async (req, res) => {
   try {
-    const { content, communityId } = req.body;
+    const { sender,content, communityId } = req.body;
 
     if (!content || !communityId) {
       return res.status(400).json({ error: "Content and communityId are required" });
     }
 
     const newMessage = new Message({
-      sender: "Anonymous", // temporary
+      sender,
       avatar: "/default-avatar.png",
       content,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
