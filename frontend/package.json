@@ -12,6 +12,7 @@
   "dependencies": {
     "axiom": "^0.1.6",
     "axios": "^1.9.0",
+    "emoji-picker-react": "^4.12.2",
     "jwt-decode": "^4.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

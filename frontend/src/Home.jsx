@@ -3,6 +3,9 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import DeleteModal from "./components/DeleteModal";
 import { io } from "socket.io-client";
+import EmojiPicker from 'emoji-picker-react';
+import { useNavigate } from "react-router-dom";
+
 
 function Home({ onLogout }) {
   const [userName, setUserName] = useState("");
@@ -17,6 +20,8 @@ function Home({ onLogout }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [communityToDelete, setCommunityToDelete] = useState(null);
   const [socket, setSocket] = useState(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -107,7 +112,16 @@ function Home({ onLogout }) {
       setIsSwitchingCommunity(false);
     }
   };
+  const [profileImage, setProfileImage] = useState(localStorage.getItem("profileImage") || "/default-avatar.png");
 
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setProfileImage(localStorage.getItem("profileImage") || "/default-avatar.png");
+    };
+  
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
   const handleNewCommunity = async () => {
     const name = prompt("Enter community name:");
     if (!name) return;
@@ -195,9 +209,9 @@ function Home({ onLogout }) {
         </div>
         <div className="user-controls">
           <button className="notification-btn">🔔</button>
-          <div className="user-avatar" onClick={onLogout}>
-            <img src="/chawa.jpeg" alt="User avatar" />
-          </div>
+          <div className="user-avatar" onClick={() => navigate("/profile")}>
+  <img src={profileImage} alt="User avatar" />
+</div>
         </div>
       </header>
 
@@ -223,7 +237,7 @@ function Home({ onLogout }) {
             ))}
           </ul>
           <div className="current-user">
-            <div className="user-avatar"><img src="/chawa.jpeg" alt="User" /></div>
+            <div className="user-avatar"><img src={profileImage} alt="User" /></div>
             <div className="user-info">
               <div className="user-name">{userName}</div>
               <div className="user-status online">Online</div>
@@ -264,7 +278,14 @@ function Home({ onLogout }) {
           </div>
 
           <form className="message-input-container" onSubmit={handleSendMessage}>
-            <button type="button" className="emoji-btn">😊</button>
+          <div className="emoji-wrapper">
+  <button type="button" className="emoji-btn" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>😊</button>
+  {showEmojiPicker && (
+    <div className="emoji-picker-container">
+      <EmojiPicker onEmojiClick={(emojiData) => setNewMessage(prev => prev + emojiData.emoji)} />
+    </div>
+  )}
+</div>
             <input
               type="text"
               className="message-input"
@@ -272,7 +293,7 @@ function Home({ onLogout }) {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
             />
-            <button type="button" className="attachment-btn">📎</button>
+            
             <button type="submit" className="send-btn">📤</button>
           </form>
         </main>

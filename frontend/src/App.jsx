@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Home from './Home'
 import Login from './Login'
 import Registration from './Registration'
-
+import Profile from './pages/Profile';
 import './css/global.css';
 import './css/auth.css';
 import './css/home.css';
@@ -76,6 +76,8 @@ function App() {
               <Navigate to="/" />
             } 
           />
+
+<Route path="/profile" element={<Profile onLogout={handleLogout} />} />
         </Routes>
       </div>
     </Router>
