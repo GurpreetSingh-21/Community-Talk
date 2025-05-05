@@ -22,6 +22,12 @@ function Home({ onLogout }) {
   const [socket, setSocket] = useState(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const navigate = useNavigate();
+  const [dmPanelUser, setDmPanelUser] = useState(null);
+  const [dmMessages, setDmMessages] = useState([]);
+  const [dmInput, setDmInput] = useState("");
+
+  const [hoveredMessageId, setHoveredMessageId] = useState(null);
+
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -64,18 +70,34 @@ function Home({ onLogout }) {
     const newSocket = io("http://localhost:3000");
     setSocket(newSocket);
 
+    const token = localStorage.getItem("token");
+    if (token) {
+      const decoded = jwtDecode(token);
+      newSocket.emit("join", decoded.id);
+    }
+
     newSocket.on("receive_message", (data) => {
+      console.log("🔴 New socket message received:", data);
       if (data.communityId === currentCommunity?.id) {
         setMessages((prev) => [...prev, data]);
-
+    
         setTimeout(() => {
           document.querySelector(".messages-container")?.scrollTo(0, 9999);
         }, 50);
       }
     });
+  
+
+
+    newSocket.on("privateMessage", (message) => {
+      if (dmPanelUser && message.senderId === dmPanelUser._id) {
+        setDmMessages((prev) => [...prev, message]);
+      }
+    });
 
     return () => newSocket.disconnect();
-  }, [currentCommunity]);
+  }, [currentCommunity, dmPanelUser]);
+
 
   const selectCommunity = async (community) => {
     if (!community?.id || isSwitchingCommunity) return;
@@ -113,12 +135,49 @@ function Home({ onLogout }) {
     }
   };
   const [profileImage, setProfileImage] = useState(localStorage.getItem("profileImage") || "/default-avatar.png");
+  const sendDirectMessage = async () => {
+    if (!dmInput.trim() || !dmPanelUser) return;
+    const token = localStorage.getItem("token");
+
+    try {
+      const res = await axios.post(
+        "http://localhost:3000/api/direct-messages",
+        { receiverId: dmPanelUser._id, content: dmInput },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setDmMessages(prev => [...prev, res.data]);
+      setDmInput("");
+    } catch (err) {
+      console.error("Error sending DM:", err);
+    }
+  };
+
+
+  const openDmPanel = async (user) => {
+    setDmPanelUser(user);
+    const token = localStorage.getItem("token");
+    const decoded = jwtDecode(token);
+
+    try {
+      const res = await axios.get(
+        `http://localhost:3000/api/direct-messages/${decoded.id}/${user._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setDmMessages(res.data);
+    } catch (err) {
+      console.error("Error fetching DM history:", err);
+    }
+  };
+
+
+
 
   useEffect(() => {
     const handleStorageChange = () => {
       setProfileImage(localStorage.getItem("profileImage") || "/default-avatar.png");
     };
-  
+
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
@@ -159,7 +218,7 @@ function Home({ onLogout }) {
       await axios.post(
         "http://localhost:3000/api/messages",
         {
-          sender:  userName,
+          sender: userName,
           content: newMessage,
           communityId: currentCommunity.id
         },
@@ -196,6 +255,13 @@ function Home({ onLogout }) {
     }
   };
 
+  // Auto-scroll DM panel when new messages come in
+  useEffect(() => {
+    const container = document.querySelector(".dm-messages");
+    if (container) container.scrollTop = container.scrollHeight;
+  }, [dmMessages]);
+
+
   return (
     <div className="home-container">
       {/* HEADER */}
@@ -210,8 +276,8 @@ function Home({ onLogout }) {
         <div className="user-controls">
           <button className="notification-btn">🔔</button>
           <div className="user-avatar" onClick={() => navigate("/profile")}>
-  <img src={profileImage} alt="User avatar" />
-</div>
+            <img src={profileImage} alt="User avatar" />
+          </div>
         </div>
       </header>
 
@@ -260,32 +326,52 @@ function Home({ onLogout }) {
             </div>
           </div>
 
+
+
           <div className="messages-container">
-            {messages.map(m => (
-              <div key={m._id || m.id} className="message">
-                <div className="message-avatar">
-                  <img src={m.avatar || "/default-avatar.png"} alt="Sender" />
-                </div>
-                <div className="message-content">
-                  <div className="message-header">
-                    <span className="sender-name">{m.sender}</span>
-                    <span className="timestamp">{m.timestamp}</span>
-                  </div>
-                  <div className="message-text">{m.content}</div>
-                </div>
-              </div>
-            ))}
+  {messages.map(m => (
+    <div className="message" key={m._id || m.id}>
+      <div 
+        className="message-avatar-wrapper"
+        onMouseEnter={() => setHoveredMessageId(m._id || m.id)}
+        onMouseLeave={() => setHoveredMessageId(null)}
+      >
+        <div className="message-avatar">
+          <img src={m.avatar || "/default-avatar.png"} alt="Sender" />
+        </div>
+        
+        {hoveredMessageId === (m._id || m.id) && (
+          <div className="hover-options">
+            <button onClick={() => openDmPanel({ _id: m.senderId, fullName: m.sender })}>
+              Text/Chat
+            </button>
           </div>
+        )}
+      </div>
+      
+      <div className="message-content">
+        <div className="message-header">
+          <span className="sender-name">{m.sender}</span>
+          <span className="timestamp">{m.timestamp}</span>
+        </div>
+        <div className="message-text">{m.content}</div>
+      </div>
+    </div>
+  ))}
+</div>
+
+
+
 
           <form className="message-input-container" onSubmit={handleSendMessage}>
-          <div className="emoji-wrapper">
-  <button type="button" className="emoji-btn" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>😊</button>
-  {showEmojiPicker && (
-    <div className="emoji-picker-container">
-      <EmojiPicker onEmojiClick={(emojiData) => setNewMessage(prev => prev + emojiData.emoji)} />
-    </div>
-  )}
-</div>
+            <div className="emoji-wrapper">
+              <button type="button" className="emoji-btn" onClick={() => setShowEmojiPicker(!showEmojiPicker)}>😊</button>
+              {showEmojiPicker && (
+                <div className="emoji-picker-container">
+                  <EmojiPicker onEmojiClick={(emojiData) => setNewMessage(prev => prev + emojiData.emoji)} />
+                </div>
+              )}
+            </div>
             <input
               type="text"
               className="message-input"
@@ -293,34 +379,65 @@ function Home({ onLogout }) {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
             />
-            
+
             <button type="submit" className="send-btn">📤</button>
           </form>
         </main>
 
         {/* MEMBERS SIDEBAR */}
-        {showMembers && (
-          <aside className="members-sidebar">
-            <h3>Community Members</h3>
-            <ul className="members-list">
-              {members.length === 0 ? (
-                <p>No members yet</p>
-              ) : (
-                members.map((m) => (
-                  <li key={m._id || m.id} className="member-item">
-                    <div className="member-avatar">
-                      <img src={m.avatar || "/default-avatar.png"} alt={m.name} />
-                    </div>
-                    <div className="member-info">
-                      <div className="member-name">{m.name}</div>
-                      <div className={`member-status ${m.status}`}>{m.status}</div>
-                    </div>
-                  </li>
-                ))
-              )}
-            </ul>
-          </aside>
-        )}
+        <aside className="right-panel">
+          {showMembers && (
+            <div className="members-sidebar">
+              <h3>Community Members</h3>
+              <ul className="members-list">
+                {members.length === 0 ? (
+                  <p>No members yet</p>
+                ) : (
+                  members.map((m) => (
+                    <li key={m._id || m.id} className="member-item">
+                      <div className="member-avatar">
+                        <img src={m.avatar || "/default-avatar.png"} alt={m.name} />
+                      </div>
+                      <div className="member-info">
+                        <div className="member-name">{m.name}</div>
+                        <div className={`member-status ${m.status}`}>{m.status}</div>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+          )}
+
+{dmPanelUser && (
+  <div className="dm-panel">
+    <div className="dm-header">
+      <h4>Chat with {dmPanelUser.fullName || dmPanelUser.username}</h4>
+      <button 
+        className="close-dm-btn" 
+        onClick={() => setDmPanelUser(null)}
+      >
+        ✕
+      </button>
+    </div>
+    <div className="dm-messages">
+      {dmMessages.map((m, i) => (
+        <div key={i} className="dm-message">{m.content}</div>
+      ))}
+    </div>
+    <div className="dm-input-container">
+      <input
+        type="text"
+        value={dmInput}
+        onChange={(e) => setDmInput(e.target.value)}
+        placeholder="Type your message..."
+      />
+      <button onClick={sendDirectMessage}>Send</button>
+    </div>
+  </div>
+)}
+        </aside>
+
       </div>
 
       {/* DELETE MODAL */}

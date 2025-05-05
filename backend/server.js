@@ -19,7 +19,7 @@ const personRoutes = require("./routes/loginNregRoutes");
 const communityRoutes = require("./routes/communityRoutes");
 const memberRoutes = require("./routes/memberRoutes");
 const messageRoutes = require("./routes/messageRoutes");
-
+const directMessageRoutes = require('./routes/directMessageRoutes');
 const app = express();
 const server = http.createServer(app);
 
@@ -34,19 +34,28 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
 
+  socket.on("join", (userId) => {
+    socket.join(userId); // join room by user ID
+  });
+
   socket.on("disconnect", () => {
     console.log(`❌ User disconnected: ${socket.id}`);
   });
 });
+
 
 // 🔧 Middleware Setup
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
 
 app.use((req, res, next) => {
-  req.io = io; // Pass io to routes
+  req.io = io;
   next();
 });
+
+// ✅ Now it's safe to use routes that rely on req.io
+app.use('/api/direct-messages', directMessageRoutes);
+
 
 app.use(passport.initialize());
 const LocalAuthMiddleware = passport.authenticate("local", { session: false });
