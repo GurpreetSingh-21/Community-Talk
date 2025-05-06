@@ -1,26 +1,29 @@
-const express = require("express");
-const router = express.Router();
-const jwt = require("jsonwebtoken");
-const Message = require("../models/Message");
-const Person = require("../person");
+// backend/routes/messageRoutes.js
+
+const express   = require("express");
+const router    = express.Router();
+const jwt       = require("jsonwebtoken");
+const Message   = require("../models/Message");
+const Person    = require("../person");
 const Community = require("../models/Community");
 
-// Email domain → allowed community name mapping
+// map email domains to community names
 const domainToCommunity = {
-  "qmail.cuny.edu": "Queens College",
+  "qmail.cuny.edu":  "Queens College",
   "baruch.cuny.edu": "Baruch College",
-  "sikhs.org": "Sikhs",
-  "gmail.com": "YourTestCommunityName"  // ← adjust this if needed
+  "sikhs.org":       "Sikhs"
 };
 
-// Middleware to check JWT token and attach user info
+// ── authUser middleware ─────────────────────────────────────────────────────────
 function authUser(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: "Authorization header missing" });
-
+  if (!authHeader) {
+    return res.status(401).json({ error: "Authorization header missing" });
+  }
   const token = authHeader.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Token missing" });
-
+  if (!token) {
+    return res.status(401).json({ error: "Token missing" });
+  }
   try {
     req.user = jwt.verify(token, process.env.MY_SECRET_KEY);
     next();
@@ -31,7 +34,8 @@ function authUser(req, res, next) {
 
 router.use(authUser);
 
-// POST /api/messages - Create a new message
+// ── POST /api/messages ─────────────────────────────────────────────────────────
+// Create a new group‐message
 router.post("/", async (req, res) => {
   try {
     const { content, communityId } = req.body;
@@ -39,36 +43,42 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Content and communityId are required" });
     }
 
+    // look up user
     const { email } = req.user;
     const person = await Person.findOne({ email });
     if (!person) return res.status(404).json({ error: "User not found" });
 
-    const sender = person.fullName;
-    const domain = email.split("@")[1];
-    const allowedName = domainToCommunity[domain];
-    if (!allowedName) return res.status(403).json({ error: "No community assigned for your domain" });
+    // check domain → community mapping
+    const domain           = email.split("@")[1].toLowerCase();
+    const allowedCommunity = domainToCommunity[domain];
+    if (!allowedCommunity) {
+      return res.status(403).json({ error: "Your email domain cannot post here" });
+    }
 
+    // verify they’re posting to the right community
     const community = await Community.findById(communityId);
     if (
       !community ||
-      allowedName.trim().toLowerCase() !== community.name.trim().toLowerCase()
+      community.name.trim().toLowerCase() !== allowedCommunity.toLowerCase()
     ) {
-      console.log("Blocked: Domain mismatch →", { allowedName, communityName: community?.name });
       return res.status(403).json({ error: "Access denied to this community" });
     }
 
+    // create & save
     const newMessage = new Message({
-      sender,
-      senderId: person._id,
-      avatar: person.avatar || "/default-avatar.png",
+      sender:    person.fullName,
+      senderId:  person._id,
+      avatar:    person.avatar || "/default-avatar.png",
       content,
       timestamp: new Date(),
       communityId
     });
+    const saved = await newMessage.save();
 
-    const savedMessage = await newMessage.save();
-    req.io.emit("receive_message", savedMessage);
-    res.status(201).json(savedMessage);
+    // emit to all connected sockets
+    req.io.emit("receive_message", saved);
+
+    res.status(201).json(saved);
 
   } catch (error) {
     console.error("POST /api/messages error:", error);
@@ -76,21 +86,24 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/messages/:communityId - Fetch messages for a community
+// ── GET /api/messages/:communityId ─────────────────────────────────────────────
+// Fetch all messages for one community (with same domain‐check)
 router.get("/:communityId", async (req, res) => {
   try {
     const { communityId } = req.params;
-    const { email } = req.user;
-    const domain = email.split("@")[1];
-    const allowedName = domainToCommunity[domain];
-    if (!allowedName) return res.status(403).json({ error: "No community assigned for your domain" });
+    const { email }       = req.user;
+
+    const domain           = email.split("@")[1].toLowerCase();
+    const allowedCommunity = domainToCommunity[domain];
+    if (!allowedCommunity) {
+      return res.status(403).json({ error: "Your email domain cannot read here" });
+    }
 
     const community = await Community.findById(communityId);
     if (
       !community ||
-      allowedName.trim().toLowerCase() !== community.name.trim().toLowerCase()
+      community.name.trim().toLowerCase() !== allowedCommunity.toLowerCase()
     ) {
-      console.log("Blocked (GET): Domain mismatch →", { allowedName, communityName: community?.name });
       return res.status(403).json({ error: "Access denied to this community" });
     }
 

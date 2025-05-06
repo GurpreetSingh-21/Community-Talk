@@ -1,43 +1,86 @@
-const express = require('express');
-const router = express.Router();
-const authenticate = require('../middleware/authenticate');
-const DirectMessage = require('../models/DirectMessage');
+// backend/routes/directMessageRoutes.js
+const express       = require("express");
+const router        = express.Router();
+const DirectMessage = require("../models/DirectMessage");
+const Person        = require("../person");
+const authenticate  = require("../middleware/authenticate");
 
+// All direct-message routes require a valid JWT
+router.use(authenticate);
 
-// POST - send a new DM
-router.post('/', authenticate, async (req, res) => {
-  const { receiverId, content } = req.body;
-  const senderId = req.user._id;
-
+/**
+ * GET /api/direct-messages/:memberId
+ * Returns the 1-on-1 history between the current user (req.user.id) and :memberId
+ */
+router.get("/:memberId", async (req, res) => {
   try {
-    const message = new DirectMessage({ senderId, receiverId, content });
-    await message.save();
+    const me   = req.user.id;
+    const them = req.params.memberId;
 
-    // ✅ Emit to receiver inside the route
-    req.io.to(receiverId.toString()).emit("privateMessage", message);
+    const history = await DirectMessage.find({
+      $or: [
+        { from: me,   to: them },
+        { from: them, to: me   }
+      ]
+    })
+    .sort("timestamp");
 
-    res.status(201).json(message);
+    return res.json(history);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to send message' });
+    console.error("DirectMessage GET error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
-
-// GET - fetch all DMs between two users
-router.get('/:user1Id/:user2Id', authenticate, async (req, res) => {
-  const { user1Id, user2Id } = req.params;
-
+/**
+ * POST /api/direct-messages
+ * Body: { to: "<recipientId>", content: "..." }
+ * Creates a new DM from req.user.id → req.body.to
+ */
+router.post("/", async (req, res) => {
   try {
-    const messages = await DirectMessage.find({
-      $or: [
-        { senderId: user1Id, receiverId: user2Id },
-        { senderId: user2Id, receiverId: user1Id }
-      ]
-    }).sort({ createdAt: 1 });
+    const from    = req.user.id;
+    const { to, content } = req.body;
 
-    res.json(messages);
+    if (!to || !content) {
+      return res
+        .status(400)
+        .json({ error: "Recipient (to) and content required" });
+    }
+
+    // Verify recipient exists
+    const recipient = await Person.findById(to);
+    if (!recipient) {
+      return res.status(404).json({ error: "Recipient not found" });
+    }
+
+    // Save to DB
+    const dm = await new DirectMessage({ from, to, content }).save();
+
+    // Lookup sender’s fullName
+    const sender = await Person.findById(from).select("fullName");
+
+    // Build enriched payload
+    const payload = {
+      _id:        dm._id,
+      from:       dm.from,
+      to:         dm.to,
+      content:    dm.content,
+      timestamp:  dm.timestamp,
+      senderName: sender.fullName
+    };
+
+    // Emit to recipient’s room
+    req.io.to(to).emit("receive_direct_message", payload);
+    // (Optionally) emit back to sender’s room so they see it too
+    req.io.to(from).emit("receive_direct_message", payload);
+
+    // Return enriched payload
+    return res.status(201).json(payload);
+
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch messages' });
+    console.error("DirectMessage POST error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

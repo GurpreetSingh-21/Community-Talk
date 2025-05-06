@@ -80,7 +80,10 @@ app.use("/", personRoutes);
 app.get("/", LocalAuthMiddleware, (req, res) => {
   res.send("hi");
 });
+// server.js
 
+// …
+app.use("/api/direct-messages", directMessageRoutes);
 // 🚀 Start server
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
