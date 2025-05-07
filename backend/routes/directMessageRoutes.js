@@ -9,6 +9,50 @@ const authenticate  = require("../middleware/authenticate");
 router.use(authenticate);
 
 /**
+ * GET /api/direct-messages
+ * Returns a list of all 1-on-1 conversations for the current user,
+ * each with the partner’s id, fullName, lastMessage, and lastTimestamp,
+ * sorted most-recent-first.
+ */
+router.get("/", async (req, res) => {
+  try {
+    const me = req.user.id;
+
+    // fetch all DMs involving me, newest first
+    const all = await DirectMessage.find({
+      $or: [{ from: me }, { to: me }]
+    })
+    .sort({ timestamp: -1 });
+
+    const seen = new Set();
+    const convos = [];
+
+    // walk through, keep first occurrence per partner
+    for (let dm of all) {
+      const partnerId = dm.from.toString() === me
+        ? dm.to.toString()
+        : dm.from.toString();
+      if (seen.has(partnerId)) continue;
+      seen.add(partnerId);
+
+      // lookup partner's name
+      const person = await Person.findById(partnerId).select("fullName");
+      convos.push({
+        _id:           partnerId,
+        fullName:      person.fullName,
+        lastMessage:   dm.content,
+        lastTimestamp: dm.timestamp
+      });
+    }
+
+    return res.json(convos);
+  } catch (err) {
+    console.error("DirectMessage LIST error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
  * GET /api/direct-messages/:memberId
  * Returns the 1-on-1 history between the current user (req.user.id) and :memberId
  */
@@ -23,7 +67,7 @@ router.get("/:memberId", async (req, res) => {
         { from: them, to: me   }
       ]
     })
-    .sort("timestamp");
+    .sort({ timestamp: 1 });
 
     return res.json(history);
   } catch (err) {
@@ -39,7 +83,7 @@ router.get("/:memberId", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   try {
-    const from    = req.user.id;
+    const from           = req.user.id;
     const { to, content } = req.body;
 
     if (!to || !content) {
@@ -62,22 +106,21 @@ router.post("/", async (req, res) => {
 
     // Build enriched payload
     const payload = {
-      _id:        dm._id,
-      from:       dm.from,
-      to:         dm.to,
-      content:    dm.content,
-      timestamp:  dm.timestamp,
-      senderName: sender.fullName
+      _id:         dm._id,
+      from:        dm.from,
+      to:          dm.to,
+      content:     dm.content,
+      timestamp:   dm.timestamp,
+      senderName:  sender.fullName
     };
 
     // Emit to recipient’s room
     req.io.to(to).emit("receive_direct_message", payload);
-    // (Optionally) emit back to sender’s room so they see it too
+    // Also echo back to sender
     req.io.to(from).emit("receive_direct_message", payload);
 
     // Return enriched payload
     return res.status(201).json(payload);
-
   } catch (err) {
     console.error("DirectMessage POST error:", err);
     return res.status(500).json({ error: "Server error" });
