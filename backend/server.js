@@ -1,91 +1,141 @@
 // 🌐 Core Modules
 const express = require("express");
-const cors = require("cors");
 const http = require("http");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
 const { Server } = require("socket.io");
-const dotenv = require("dotenv");
-dotenv.config();
-
-// 🧠 Middleware and Auth
-const passport = require("passport");
-const LocalStrategy = require("passport-local");
-const authenticate = require("./middleware/authenticate");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 // 🔌 Database
-const db = require("./db");
+const { connectDB } = require("./db");
 
-// 📁 Route Files
+// 🧰 Routes & Middleware
+const authenticate = require("./middleware/authenticate");
 const personRoutes = require("./routes/loginNregRoutes");
 const communityRoutes = require("./routes/communityRoutes");
 const memberRoutes = require("./routes/memberRoutes");
 const messageRoutes = require("./routes/messageRoutes");
-const directMessageRoutes = require('./routes/directMessageRoutes');
+const directMessageRoutes = require("./routes/directMessageRoutes");
+
+// ⚙️ App & Server
 const app = express();
 const server = http.createServer(app);
 
-// 🧠 Socket.IO setup
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"],
-  },
-});
+// ───────────────────────── Configuration ─────────────────────────
+const ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+const PORT = Number(process.env.PORT || 3000);
+const JWT_SECRET = process.env.MY_SECRET_KEY;
+if (!JWT_SECRET) {
+  console.warn("⚠️  MY_SECRET_KEY is not set. JWT auth will fail.");
+}
 
-io.on("connection", (socket) => {
-  console.log(`🔌 User connected: ${socket.id}`);
+// ─────────────────────── Security & Middleware ───────────────────
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(
+  cors({
+    origin: ORIGIN,
+    credentials: false,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+app.use(express.json({ limit: "1mb" }));
+app.use(morgan("dev"));
 
-  socket.on("join", (userId) => {
-    socket.join(userId); // join room by user ID
-  });
-
-  socket.on("disconnect", () => {
-    console.log(`❌ User disconnected: ${socket.id}`);
-  });
-});
-
-
-// 🔧 Middleware Setup
-app.use(cors({ origin: "http://localhost:5173" }));
-app.use(express.json());
-
-app.use((req, res, next) => {
+// Make io available on req (for routes to emit)
+let io;
+app.use((req, _res, next) => {
   req.io = io;
   next();
 });
 
-// ✅ Now it's safe to use routes that rely on req.io
-app.use('/api/direct-messages', directMessageRoutes);
+// Simple root + health for quick checks
+app.get("/", (_req, res) => res.json({ ok: true, service: "community-talk-api" }));
+app.get("/health", (_req, res) =>
+  res.status(200).json({ ok: true, uptime: process.uptime() })
+);
 
-
-app.use(passport.initialize());
-const LocalAuthMiddleware = passport.authenticate("local", { session: false });
-
-// 🧾 Logger
-app.use((req, res, next) => {
-  console.log(
-    `${new Date().toLocaleString()} Request made to: ${req.originalUrl}`
-  );
-  next();
+// ───────────────────────── Socket.IO ─────────────────────────
+io = new Server(server, {
+  cors: { origin: ORIGIN, methods: ["GET", "POST"], allowedHeaders: ["authorization", "content-type"] },
+  path: "/socket.io",
+  pingTimeout: 25000,
+  pingInterval: 20000,
 });
 
-// 🔐 Protected Routes
+// Verify JWT on the socket and attach user
+io.use((socket, next) => {
+  try {
+    const token =
+      socket.handshake.auth?.token ||
+      (socket.handshake.headers?.authorization || "").split(" ")[1];
+
+    if (!token) return next(new Error("No token provided"));
+    const decoded = jwt.verify(token, JWT_SECRET);
+    socket.user = { id: decoded.id, email: decoded.email, fullName: decoded.fullName };
+    return next();
+  } catch (_err) {
+    return next(new Error("Invalid token"));
+  }
+});
+
+io.on("connection", (socket) => {
+  const uid = socket.user?.id;
+  console.log(`🔌 Socket connected ${socket.id} (user: ${uid || "unknown"})`);
+
+  // Join personal user room (used by DMs)
+  if (uid) socket.join(uid);
+
+  // Back-compat: client calls socket.emit("join", userId)
+  socket.on("join", (userId) => {
+    if (userId) socket.join(userId);
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log(`❌ Socket disconnected ${socket.id} (${reason})`);
+  });
+});
+
+// ───────────────────────── Routes ─────────────────────────
+// Public auth routes (register/login/profile)
+app.use("/", personRoutes);
+
+// Protected API routes (JWT required)
 app.use("/api/communities", authenticate, communityRoutes);
 app.use("/api/members", authenticate, memberRoutes);
 app.use("/api/messages", authenticate, messageRoutes);
+app.use("/api/direct-messages", authenticate, directMessageRoutes);
 
-// 🔓 Public Routes
-app.use("/", personRoutes);
+// 404 handler
+app.use((req, res) => res.status(404).json({ error: "Not Found" }));
 
-// 🏠 Test Route
-app.get("/", LocalAuthMiddleware, (req, res) => {
-  res.send("hi");
+// Error handler (last)
+app.use((err, _req, res, _next) => {
+  console.error("💥 Unhandled error:", err);
+  res.status(err.status || 500).json({ error: err.message || "Server Error" });
 });
-// server.js
 
-// …
-app.use("/api/direct-messages", directMessageRoutes);
-// 🚀 Start server
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-  console.log(`✅ Server running with Socket.IO on port ${port}`);
+// Log crashes that would otherwise be silent
+process.on("unhandledRejection", (reason) => {
+  console.error("🔥 UnhandledRejection:", reason);
 });
+process.on("uncaughtException", (err) => {
+  console.error("🔥 UncaughtException:", err);
+});
+
+// ───────────────────────── Startup ─────────────────────────
+(async () => {
+  try {
+    await connectDB(); // make sure db.js exports connectDB()
+    server.listen(PORT, () => {
+      console.log(`✅ Server running on http://localhost:${PORT}`);
+      console.log(`🔗 CORS origin: ${ORIGIN}`);
+      console.log(`🩺 Health:      http://localhost:${PORT}/health`);
+    });
+  } catch (err) {
+    console.error("❌ Failed to start server:", err);
+    process.exit(1);
+  }
+})();

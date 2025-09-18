@@ -1,24 +1,37 @@
-const mongoose = require('mongoose');
-require('dotenv').config();
-const mongo_URL = process.env.db_url
-const mongoURL_local = process.env.mongoURL_local
-//const mongoURL = mongoURL_local;
-const mongoURL = mongo_URL
-mongoose.connect(mongoURL, {
-    useNewUrlParser:true,
-    useUnifiedTopology: true
-})
+// backend/db.js
+const mongoose = require("mongoose");
 
-const db = mongoose.connection;// these are nothing but objectes of mongodb
+let cached = null;
 
-// these are all the event listners which moongoDb understands
-db.on('connected', ()=>{
-    console.log('connected to MongoDB')
-});
-db.on('error', ()=>{
-    console.log('MongoDB connection error')
-});
-db.on('disconnected', () => {
-    console.log('Disconnected to mongoDB');
-});
-module.exports = db;
+async function connectDB() {
+  if (cached) return cached;
+
+  const uri =
+    process.env.MONGODB_URI ||
+    process.env.db_url ||
+    process.env.mongoURL_local ||
+    "mongodb://127.0.0.1:27017/communitytalk"; // last-resort local
+
+  mongoose.set("strictQuery", true);
+
+  try {
+    const conn = await mongoose.connect(uri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 10000,
+    });
+
+    const db = conn.connection;
+    db.on("connected",    () => console.log("✅ MongoDB connected"));
+    db.on("error",        (e) => console.error("❌ MongoDB error:", e.message));
+    db.on("disconnected", () => console.log("⚠️  MongoDB disconnected"));
+
+    cached = db;
+    return db;
+  } catch (err) {
+    console.error("❌ Failed to connect to MongoDB:", err.message);
+    throw err; // causes server startup to fail (expected if URI is bad)
+  }
+}
+
+module.exports = { connectDB };

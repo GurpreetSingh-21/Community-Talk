@@ -1,111 +1,139 @@
-
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
+// frontend/src/Login.jsx
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function Login({ onLogin }) {
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
-  const [scrolled, setScrolled] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  // API base (fallback to localhost)
+  const RAW = import.meta.env.VITE_API_URL || "http://localhost:3000";
+  const API = RAW.replace(/\/+$/, "");
 
-  const handleChange = (e) => {
+  const onChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+    setForm((f) => ({ ...f, [name]: value }));
+    if (errors[name]) setErrors((er) => ({ ...er, [name]: "" }));
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.email) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+  const validate = () => {
+    const er = {};
+    if (!form.email) er.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(form.email)) er.email = "Email is invalid";
 
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    if (!form.password) er.password = "Password is required";
+    else if (form.password.length < 6) er.password = "At least 6 characters";
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(er);
+    return !Object.keys(er).length;
   };
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!validate()) return;
+    setSubmitting(true);
     try {
-      const res = await axios.post('http://localhost:3000/login', formData);
-      const token = res.data.token;
-      localStorage.setItem('token', token);
-      alert("Login successful!");
-      if (onLogin) onLogin(token);
-    } catch (error) {
-      console.error(error);
-      alert(error.response?.data?.error || "Something went wrong");
+      const { data } = await axios.post(`${API}/login`, form);
+      localStorage.setItem("token", data.token);
+      onLogin?.(data.token);
+      navigate("/home");
+    } catch (err) {
+      alert(err?.response?.data?.error ?? "Login failed");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      <header className={`login-navbar ${scrolled ? 'scrolled' : ''}`}>
-        <div className="login-logo" onClick={() => navigate("/")}>
-          <span className="logo-text">Community</span>
-          <span className="logo-highlight">Talk</span>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 bg-background/80 backdrop-blur border-b">
+        <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
+          <div
+            className="font-bold cursor-pointer"
+            onClick={() => navigate("/")}
+          >
+            <span>Community</span>
+            <span className="text-primary">Talk</span>
+          </div>
+          <nav className="text-sm space-x-4">
+            <Link className="hover:underline" to="/">Home</Link>
+            <Link className="hover:underline" to="/register">Register</Link>
+          </nav>
         </div>
-        <nav className="login-nav">
-          <Link className="nav-link" to="/">Home</Link>
-          <Link className="nav-link" to="/register">Register</Link>
-        </nav>
       </header>
 
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1>Community Talk</h1>
-          <p>Welcome back! Please log in to continue.</p>
-        </div>
-
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email" id="email" name="email"
-              value={formData.email} onChange={handleChange}
-              placeholder="Enter your email"
-              className={errors.email ? 'error' : ''}
-            />
-            {errors.email && <p className="error-message">{errors.email}</p>}
+      {/* Card */}
+      <main className="mx-auto max-w-md px-4 py-10">
+        <Card className="p-6 space-y-6">
+          <div className="text-center space-y-1">
+            <h1 className="text-2xl font-bold">Community Talk</h1>
+            <p className="text-sm text-muted-foreground">
+              Welcome back! Please log in to continue.
+            </p>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password" id="password" name="password"
-              value={formData.password} onChange={handleChange}
-              placeholder="Enter your password"
-              className={errors.password ? 'error' : ''}
-            />
-            {errors.password && <p className="error-message">{errors.password}</p>}
-          </div>
-
-          <div className="form-options">
-            <div className="remember-me">
-              <input type="checkbox" id="remember" />
-              <label htmlFor="remember">Remember me</label>
+          <form className="space-y-4" onSubmit={submit}>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={onChange}
+                autoComplete="email"
+              />
+              {errors.email && (
+                <p className="text-sm text-red-600">{errors.email}</p>
+              )}
             </div>
-            <a href="#" className="forgot-password">Forgot password?</a>
-          </div>
 
-          <button type="submit" className="auth-button">Log In</button>
-        </form>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                value={form.password}
+                onChange={onChange}
+                autoComplete="current-password"
+              />
+              {errors.password && (
+                <p className="text-sm text-red-600">{errors.password}</p>
+              )}
+            </div>
 
-        <div className="auth-footer">
-          <p>Don't have an account? <Link to="/register" className="auth-link">Sign up</Link></p>
-        </div>
-      </div>
+            <div className="flex items-center justify-between text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input type="checkbox" className="size-4" />
+                Remember me
+              </label>
+              <a className="hover:underline" href="#">
+                Forgot password?
+              </a>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Logging in..." : "Log In"}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link to="/register" className="underline">
+              Sign up
+            </Link>
+          </p>
+        </Card>
+      </main>
     </div>
   );
 }

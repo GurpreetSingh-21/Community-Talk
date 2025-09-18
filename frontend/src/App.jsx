@@ -1,93 +1,88 @@
 // src/App.jsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
-  Navigate
-} from 'react-router-dom'
+  Navigate,
+} from "react-router-dom";
 
-import Home from './Home'
-import Login from './Login'
-import Registration from './Registration'
-import Profile from './pages/Profile';
-import Landing from './Landing';
-import './css/global.css';
-import './css/auth.css';
-import './css/home.css';
-import './css/responsive.css';
+import Home from "./Home";
+import Login from "./Login";
+import Registration from "./Registration";
+import Profile from "./pages/Profile";
+import Landing from "./Landing";
 
 function App() {
-  // track auth state
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // on mount, check for token
+  // Check for JWT token on mount
   useEffect(() => {
-    setIsAuthenticated(!!localStorage.getItem('token'))
-  }, [])
+    setIsAuthenticated(!!localStorage.getItem("token"));
+  }, []);
 
-  const handleLogin = () => {
-    setIsAuthenticated(true)
-  }
-  const handleRegistration = () => {
-    setIsAuthenticated(true)
-  }
+  const handleLogin = () => setIsAuthenticated(true);
+  const handleRegistration = () => setIsAuthenticated(true);
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    setIsAuthenticated(false)
-  }
+    localStorage.removeItem("token");
+    setIsAuthenticated(false);
+  };
 
   return (
     <Router>
-      <div className="app-container">
-        <Routes>
-          {/* Landing page: always public */}
-          <Route path="/" element={<Landing />} />
+      <Routes>
+        {/* Public landing */}
+        <Route path="/" element={<Landing />} />
 
-          {/* Login & Registration */}
-          <Route
-            path="/login"
-            element={
-              isAuthenticated
-                ? <Navigate to="/home" replace />
-                : <Login onLogin={handleLogin} />
-            }
-          />
-          <Route
-            path="/register"
-            element={
-              isAuthenticated
-                ? <Navigate to="/home" replace />
-                : <Registration onRegister={handleRegistration} />
-            }
-          />
+        {/* Auth routes */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/home" replace />
+            ) : (
+              <Login onLogin={handleLogin} />
+            )
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/home" replace />
+            ) : (
+              <Registration onRegister={handleRegistration} />
+            )
+          }
+        />
 
-          {/* Protected Home */}
-          <Route
-            path="/home"
-            element={
-              isAuthenticated
-                ? <Home onLogout={handleLogout} />
-                : <Navigate to="/login" replace />
-            }
-          />
+        {/* Protected routes */}
+        <Route
+          path="/home"
+          element={
+            isAuthenticated ? (
+              <Home onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            isAuthenticated ? (
+              <Profile onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
-          {/* Protected Profile */}
-          <Route
-            path="/profile"
-            element={
-              isAuthenticated
-                ? <Profile onLogout={handleLogout} />
-                : <Navigate to="/login" replace />
-            }
-          />
-
-          {/* Catch-all: redirect unknown paths back to landing */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;
