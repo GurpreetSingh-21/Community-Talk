@@ -144,9 +144,16 @@ export default function Home() {
     });
 
     sock.on("receive_direct_message", (dm) => {
-      if (dm.from === userId) return;
-      upsertNotification(dm.from, dm.senderName, dm.content);
-      if (dmPanelUser?._id === dm.from) {
+      // Notification only if you are the recipient
+      if (dm.to === userId) {
+        upsertNotification(dm.from, dm.senderName, dm.content);
+      }
+
+      // Append if this panel is the active conversation
+      if (
+        dmPanelUser &&
+        (dm.from === dmPanelUser._id || dm.to === dmPanelUser._id)
+      ) {
         setDmMessages((m) => [...m, dm]);
       }
     });
@@ -160,57 +167,57 @@ export default function Home() {
   }, [dmMessages]);
 
   const selectCommunity = async (c) => {
-  if (!c?.id || isSwitchingCommunity) return;
-  setIsSwitchingCommunity(true);
-  setAccessNotice("");
-  setCurrentCommunity(c);
-  setCommunities((cs) => cs.map((x) => ({ ...x, active: x.id === c.id })));
+    if (!c?.id || isSwitchingCommunity) return;
+    setIsSwitchingCommunity(true);
+    setAccessNotice("");
+    setCurrentCommunity(c);
+    setCommunities((cs) => cs.map((x) => ({ ...x, active: x.id === c.id })));
 
-  try {
-    const [mr, mb] = await Promise.all([
-      axios.get(`${API}/api/messages/${c.id}`, { headers: authHeader() }),
-      axios.get(`${API}/api/members/${c.id}`, { headers: authHeader() }),
-    ]);
+    try {
+      const [mr, mb] = await Promise.all([
+        axios.get(`${API}/api/messages/${c.id}`, { headers: authHeader() }),
+        axios.get(`${API}/api/members/${c.id}`, { headers: authHeader() }),
+      ]);
 
-    // Messages: always array
-    setMessages(Array.isArray(mr.data) ? mr.data : []);
+      // Messages: always array
+      setMessages(Array.isArray(mr.data) ? mr.data : []);
 
-    // Members: normalize shape
-    const memberItems = Array.isArray(mb.data?.items)
-      ? mb.data.items
-      : Array.isArray(mb.data)
-      ? mb.data
-      : [];
-    setMembers(memberItems);
+      // Members: normalize shape
+      const memberItems = Array.isArray(mb.data?.items)
+        ? mb.data.items
+        : Array.isArray(mb.data)
+          ? mb.data
+          : [];
+      setMembers(memberItems);
 
-    // Auto-scroll to bottom
-    setTimeout(() => {
-      const el = document.querySelector("[data-messages-container]");
-      el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    }, 30);
-  } catch (e) {
-    // Gracefully show why it failed
-    if (axios.isAxiosError(e)) {
-      if (e.response?.status === 403) {
-        setAccessNotice(
-          "You don’t have access to this community’s messages. (If you’re in dev, set SKIP_DOMAIN_CHECK=true in the backend .env and restart the server.)"
-        );
-      } else if (e.response?.status === 401) {
-        setAccessNotice("Your session is invalid or expired. Please log in again.");
-      } else if (e.response?.data?.error) {
-        setAccessNotice(`Error: ${e.response.data.error}`);
+      // Auto-scroll to bottom
+      setTimeout(() => {
+        const el = document.querySelector("[data-messages-container]");
+        el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      }, 30);
+    } catch (e) {
+      // Gracefully show why it failed
+      if (axios.isAxiosError(e)) {
+        if (e.response?.status === 403) {
+          setAccessNotice(
+            "You don’t have access to this community’s messages. (If you’re in dev, set SKIP_DOMAIN_CHECK=true in the backend .env and restart the server.)"
+          );
+        } else if (e.response?.status === 401) {
+          setAccessNotice("Your session is invalid or expired. Please log in again.");
+        } else if (e.response?.data?.error) {
+          setAccessNotice(`Error: ${e.response.data.error}`);
+        } else {
+          setAccessNotice("Could not load messages/members for this community.");
+        }
       } else {
         setAccessNotice("Could not load messages/members for this community.");
       }
-    } else {
-      setAccessNotice("Could not load messages/members for this community.");
+      setMessages([]);
+      setMembers([]);
+    } finally {
+      setIsSwitchingCommunity(false);
     }
-    setMessages([]);
-    setMembers([]);
-  } finally {
-    setIsSwitchingCommunity(false);
-  }
-};
+  };
 
   const handleNewCommunity = async () => {
     const name = prompt("Enter community name:");
@@ -285,7 +292,7 @@ export default function Home() {
       const { data } = await axios.get(`${API}/api/direct-messages/${panelUser._id}`, {
         headers: authHeader(),
       });
-      setDmMessages(Array.isArray(data) ? data : []);
+      setDmMessages(Array.isArray(data?.items) ? data.items : []);
     } catch (e) {
       console.error(e);
     }
@@ -624,8 +631,14 @@ export default function Home() {
                     {dmMessages.map((d, i) => (
                       <div
                         key={i}
-                        className="max-w-[80%] rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-800"
+                        className={`max-w-[80%] px-3 py-2 text-sm rounded-2xl ${d.from === userId
+                            ? "self-end bg-indigo-600 text-white"
+                            : "self-start bg-slate-100 text-slate-800"
+                          }`}
                       >
+                        <div className="text-xs opacity-75 mb-1">
+                          {d.senderName || (d.from === userId ? "You" : "Them")}
+                        </div>
                         {d.content}
                       </div>
                     ))}
