@@ -50,9 +50,7 @@ export default function Home() {
     localStorage.getItem("profileImage") || "/default-avatar.png"
   );
 
-  // helpful UI notice if the backend denies access (403)
   const [accessNotice, setAccessNotice] = useState("");
-
   const navigate = useNavigate();
 
   const authHeader = () => {
@@ -112,8 +110,6 @@ export default function Home() {
         const { data } = await axios.get(`${API}/api/communities`, {
           headers: authHeader(),
         });
-
-        // Accept either array or { items: [...] }
         const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
         const fixed = list.map((c) => ({ id: c._id, name: c.name, active: false }));
         setCommunities(fixed);
@@ -144,16 +140,10 @@ export default function Home() {
     });
 
     sock.on("receive_direct_message", (dm) => {
-      // Notification only if you are the recipient
       if (dm.to === userId) {
         upsertNotification(dm.from, dm.senderName, dm.content);
       }
-
-      // Append if this panel is the active conversation
-      if (
-        dmPanelUser &&
-        (dm.from === dmPanelUser._id || dm.to === dmPanelUser._id)
-      ) {
+      if (dmPanelUser && (dm.from === dmPanelUser._id || dm.to === dmPanelUser._id)) {
         setDmMessages((m) => [...m, dm]);
       }
     });
@@ -179,24 +169,20 @@ export default function Home() {
         axios.get(`${API}/api/members/${c.id}`, { headers: authHeader() }),
       ]);
 
-      // Messages: always array
       setMessages(Array.isArray(mr.data) ? mr.data : []);
 
-      // Members: normalize shape
       const memberItems = Array.isArray(mb.data?.items)
         ? mb.data.items
         : Array.isArray(mb.data)
-          ? mb.data
-          : [];
+        ? mb.data
+        : [];
       setMembers(memberItems);
 
-      // Auto-scroll to bottom
       setTimeout(() => {
         const el = document.querySelector("[data-messages-container]");
         el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
       }, 30);
     } catch (e) {
-      // Gracefully show why it failed
       if (axios.isAxiosError(e)) {
         if (e.response?.status === 403) {
           setAccessNotice(
@@ -314,7 +300,8 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+    // Use dynamic viewport height so iOS toolbars don’t crush the layout
+    <div className="flex h-dvh min-h-0 flex-col bg-slate-50 text-slate-900">
       {/* HEADER */}
       <header className="flex h-14 items-center justify-between border-b border-indigo-700/20 bg-gradient-to-r from-indigo-600 to-indigo-500 px-3 text-white shadow">
         <Button
@@ -328,26 +315,18 @@ export default function Home() {
         </Button>
         <h1 className="text-sm font-semibold sm:text-base">Community Talk</h1>
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            className="text-white hover:bg-white/10"
-            size="icon"
-            aria-label="Notifications"
-          >
+          <Button variant="ghost" className="text-white hover:bg-white/10" size="icon" aria-label="Notifications">
             🔔
           </Button>
-          <Avatar
-            className="size-8 cursor-pointer ring-2 ring-white/30"
-            onClick={() => navigate("/profile")}
-          >
+          <Avatar className="size-8 cursor-pointer ring-2 ring-white/30" onClick={() => navigate("/profile")}>
             <AvatarImage src={profileImage} />
             <AvatarFallback>{userName?.[0] ?? "U"}</AvatarFallback>
           </Avatar>
         </div>
       </header>
 
-      {/* MAIN */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* MAIN (lock the height; children must use min-h-0 to scroll) */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* LEFT SIDEBAR */}
         <aside
           className={[
@@ -355,17 +334,14 @@ export default function Home() {
             showSidebar ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           ].join(" ")}
         >
-          <Button
-            className="mb-4 w-full bg-indigo-600 text-white hover:bg-indigo-700"
-            onClick={handleNewCommunity}
-          >
+          <Button className="mb-4 w-full bg-indigo-600 text-white hover:bg-indigo-700" onClick={handleNewCommunity}>
             + New Community
           </Button>
 
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Your Communities
-          </div>
-          <ScrollArea className="flex-1">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Your Communities</div>
+
+          {/* Make the list column scroll without growing the page */}
+          <ScrollArea className="flex-1 min-h-0">
             <ul className="space-y-1 pr-2">
               {communities.map((c) => (
                 <li
@@ -375,23 +351,15 @@ export default function Home() {
                     c.active ? "bg-indigo-50 text-indigo-700" : "text-slate-700",
                   ].join(" ")}
                 >
-                  <button
-                    className="flex flex-1 items-center gap-2 text-left"
-                    onClick={() => selectCommunity(c)}
-                  >
-                    <span
-                      className={[
-                        "inline-block size-2 rounded-full",
-                        c.active ? "bg-indigo-600" : "bg-slate-300",
-                      ].join(" ")}
-                    />
+                  <button className="flex flex-1 items-center gap-2 text-left" onClick={() => selectCommunity(c)}>
+                    <span className={["inline-block size-2 rounded-full", c.active ? "bg-indigo-600" : "bg-slate-300"].join(" ")} />
                     <span className="truncate">{c.name}</span>
                   </button>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="text-slate-500 hover:bg-indigo-50 hover:text-indigo-700"
-                    onClick={() => confirmDeleteCommunity(c)}
+                    onClick={() => setShowDeleteModal(true) || setCommunityToDelete(c)}
                     aria-label={`Delete ${c.name}`}
                   >
                     ⋮
@@ -402,18 +370,14 @@ export default function Home() {
 
             {/* All Conversations */}
             <div className="mt-6">
-              <h4 className="mb-2 text-sm font-semibold text-slate-700">
-                All Conversations
-              </h4>
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">All Conversations</h4>
               <ul className="space-y-1 pr-2">
                 {dmHistory.map((u) => (
                   <li key={u._id}>
                     <button
                       className={[
                         "w-full rounded-md px-2 py-2 text-left hover:bg-indigo-50",
-                        dmPanelUser?._id === u._id
-                          ? "bg-indigo-50 text-indigo-700"
-                          : "text-slate-700",
+                        dmPanelUser?._id === u._id ? "bg-indigo-50 text-indigo-700" : "text-slate-700",
                       ].join(" ")}
                       onClick={() => openDmPanel(u)}
                     >
@@ -424,24 +388,18 @@ export default function Home() {
               </ul>
             </div>
 
-            {/* Unseen DM Notifications */}
+            {/* New DM notifications */}
             {notifications.length > 0 && (
               <div className="mt-6">
-                <h4 className="mb-2 text-sm font-semibold text-slate-700">
-                  New DMs
-                </h4>
+                <h4 className="mb-2 text-sm font-semibold text-slate-700">New DMs</h4>
                 <ul className="space-y-1 pr-2">
                   {notifications.map((n) => (
                     <li key={n.partnerId}>
                       <button
                         className="w-full rounded-md px-2 py-2 text-left text-slate-700 hover:bg-indigo-50"
-                        onClick={() =>
-                          openDmPanel({ _id: n.partnerId, fullName: n.partnerName })
-                        }
+                        onClick={() => openDmPanel({ _id: n.partnerId, fullName: n.partnerName })}
                       >
-                        <strong className="text-indigo-700">
-                          {n.partnerName}:{" "}
-                        </strong>
+                        <strong className="text-indigo-700">{n.partnerName}: </strong>
                         <span className="text-slate-500">{n.content}</span>
                       </button>
                     </li>
@@ -465,16 +423,14 @@ export default function Home() {
         </aside>
 
         {/* CHAT AREA */}
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {/* Chat header */}
           <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
             <div>
               <h2 className="text-base font-semibold text-slate-800">
                 {currentCommunity?.name || "Select a Community"}
               </h2>
-              <span className="text-xs text-slate-500">
-                {members.length} member{members.length !== 1 ? "s" : ""}
-              </span>
+              <span className="text-xs text-slate-500">{members.length} member{members.length !== 1 ? "s" : ""}</span>
             </div>
             <div>
               <Button
@@ -482,6 +438,7 @@ export default function Home() {
                 size="icon"
                 className="border-slate-200 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
                 onClick={() => setShowMembers((m) => !m)}
+                aria-label="Toggle members"
               >
                 👥
               </Button>
@@ -490,13 +447,11 @@ export default function Home() {
 
           {/* Access notice */}
           {accessNotice && (
-            <div className="bg-amber-50 px-4 py-2 text-sm text-amber-800 border-b border-amber-200">
-              {accessNotice}
-            </div>
+            <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">{accessNotice}</div>
           )}
 
-          {/* Messages */}
-          <ScrollArea className="flex-1 bg-slate-50 px-4 py-3" data-messages-container>
+          {/* Messages (THIS is what scrolls) */}
+          <ScrollArea className="flex-1 min-h-0 bg-slate-50 px-4 py-3" data-messages-container>
             <div className="mx-auto flex max-w-3xl flex-col gap-4">
               {messages.map((m) => (
                 <div
@@ -515,9 +470,7 @@ export default function Home() {
                       <Button
                         size="sm"
                         className="absolute left-[44px] top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-indigo-600 text-white shadow hover:bg-indigo-700"
-                        onClick={() =>
-                          openDmPanel({ _id: m.senderId, fullName: m.sender })
-                        }
+                        onClick={() => openDmPanel({ _id: m.senderId, fullName: m.sender })}
                       >
                         Text/Chat
                       </Button>
@@ -538,9 +491,12 @@ export default function Home() {
             </div>
           </ScrollArea>
 
-          {/* Input */}
-          <form onSubmit={handleSendMessage} className="border-t border-slate-200 bg-white px-4 py-3">
-            <div className="mx-auto flex max-w-3xl items-end gap-2">
+          {/* Composer (STICKY, never scrolls out) */}
+          <form
+            onSubmit={handleSendMessage}
+            className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/70"
+          >
+            <div className="relative mx-auto flex max-w-3xl items-end gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -550,13 +506,14 @@ export default function Home() {
               >
                 😊
               </Button>
+
+              {/* Anchor the picker so it does NOT affect layout */}
               {showEmojiPicker && (
-                <div className="relative">
-                  <div className="absolute bottom-12 z-10">
-                    <EmojiPicker onEmojiClick={(e) => setNewMessage((n) => n + e.emoji)} />
-                  </div>
+                <div className="absolute bottom-14 left-0 z-20">
+                  <EmojiPicker onEmojiClick={(e) => setNewMessage((n) => n + e.emoji)} />
                 </div>
               )}
+
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
@@ -570,13 +527,11 @@ export default function Home() {
           </form>
         </main>
 
-        {/* RIGHT PANEL */}
-        <aside className="hidden w-80 shrink-0 border-l border-slate-200 bg-white md:flex md:flex-col">
+        {/* RIGHT PANEL (desktop) */}
+        <aside className="hidden w-80 shrink-0 border-l border-slate-200 bg-white md:flex md:min-h-0 md:flex-col">
           {showMembers && (
             <div className="flex-1 p-3">
-              <h3 className="mb-2 text-sm font-semibold text-slate-800">
-                Community Members
-              </h3>
+              <h3 className="mb-2 text-sm font-semibold text-slate-800">Community Members</h3>
               <ScrollArea className="h-full">
                 <ul className="space-y-1 pr-2">
                   {members.map((m) => (
@@ -590,19 +545,13 @@ export default function Home() {
                     >
                       <Avatar className="size-9 ring-2 ring-indigo-100">
                         <AvatarImage src={m.avatar || "/default-avatar.png"} />
-                        <AvatarFallback>
-                          {(m.fullName || m.name || m.email || "?")[0]}
-                        </AvatarFallback>
+                        <AvatarFallback>{(m.fullName || m.name || m.email || "?")[0]}</AvatarFallback>
                       </Avatar>
-                      <span className="text-sm font-medium">
-                        {m.fullName || m.name || m.email}
-                      </span>
+                      <span className="text-sm font-medium">{m.fullName || m.name || m.email}</span>
                       <span
                         className={[
                           "ml-auto text-xs font-medium",
-                          (m.status || "").toLowerCase() === "online"
-                            ? "text-emerald-600"
-                            : "text-red-500",
+                          (m.status || "").toLowerCase() === "online" ? "text-emerald-600" : "text-red-500",
                         ].join(" ")}
                       >
                         {m.status}
@@ -631,14 +580,11 @@ export default function Home() {
                     {dmMessages.map((d, i) => (
                       <div
                         key={i}
-                        className={`max-w-[80%] px-3 py-2 text-sm rounded-2xl ${d.from === userId
-                            ? "self-end bg-indigo-600 text-white"
-                            : "self-start bg-slate-100 text-slate-800"
-                          }`}
+                        className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                          d.from === userId ? "self-end bg-indigo-600 text-white" : "self-start bg-slate-100 text-slate-800"
+                        }`}
                       >
-                        <div className="text-xs opacity-75 mb-1">
-                          {d.senderName || (d.from === userId ? "You" : "Them")}
-                        </div>
+                        <div className="mb-1 text-xs opacity-75">{d.senderName || (d.from === userId ? "You" : "Them")}</div>
                         {d.content}
                       </div>
                     ))}
@@ -665,6 +611,67 @@ export default function Home() {
             </div>
           )}
         </aside>
+
+        {/* Mobile members drawer */}
+        {!showMembers && (
+          <div className="md:hidden">
+            {/* noop – toggled by button; drawer appears below */}
+          </div>
+        )}
+      </div>
+
+      {/* MOBILE: slide-over members when showMembers is true */}
+      <div
+        className={[
+          "fixed inset-0 z-30 md:hidden transition-opacity",
+          showMembers ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+        ].join(" ")}
+        aria-hidden={!showMembers}
+        onClick={() => setShowMembers(false)}
+      >
+        <div className="absolute inset-0 bg-black/30" />
+        <div
+          className={[
+            "absolute right-0 top-0 h-full w-[85%] max-w-sm bg-white shadow-xl transition-transform",
+            showMembers ? "translate-x-0" : "translate-x-full",
+          ].join(" ")}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <h3 className="text-sm font-semibold">Community Members</h3>
+            <Button variant="ghost" size="icon" onClick={() => setShowMembers(false)}>
+              ✕
+            </Button>
+          </div>
+          <ScrollArea className="h-[calc(100%-52px)] p-3">
+            <ul className="space-y-1 pr-2">
+              {members.map((m) => (
+                <li
+                  key={m._id}
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-slate-700 hover:bg-indigo-50"
+                  onClick={() => {
+                    setShowMembers(false);
+                    openDmPanel(m);
+                  }}
+                >
+                  <Avatar className="size-9 ring-2 ring-indigo-100">
+                    <AvatarImage src={m.avatar || "/default-avatar.png"} />
+                    <AvatarFallback>{(m.fullName || m.name || m.email || "?")[0]}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium">{m.fullName || m.name || m.email}</span>
+                  <span
+                    className={[
+                      "ml-auto text-xs font-medium",
+                      (m.status || "").toLowerCase() === "online" ? "text-emerald-600" : "text-red-500",
+                    ].join(" ")}
+                  >
+                    {m.status}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </ScrollArea>
+        </div>
       </div>
 
       {/* Delete modal */}
