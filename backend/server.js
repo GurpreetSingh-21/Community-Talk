@@ -11,6 +11,9 @@ require("dotenv").config();
 // 🔌 Database
 const { connectDB } = require("./db");
 
+// 👥 Presence (simple in-memory tracker)
+const presence = require("./presence");
+
 // 🧰 Routes & Middleware
 const authenticate = require("./middleware/authenticate");
 const personRoutes = require("./routes/loginNregRoutes");
@@ -44,10 +47,11 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
 
-// Make io available on req (for routes to emit)
+// Make io & presence available on req (routes can emit & read status)
 let io;
 app.use((req, _res, next) => {
   req.io = io;
+  req.presence = presence;
   next();
 });
 
@@ -59,7 +63,11 @@ app.get("/health", (_req, res) =>
 
 // ───────────────────────── Socket.IO ─────────────────────────
 io = new Server(server, {
-  cors: { origin: ORIGIN, methods: ["GET", "POST"], allowedHeaders: ["authorization", "content-type"] },
+  cors: {
+    origin: ORIGIN,
+    methods: ["GET", "POST"],
+    allowedHeaders: ["authorization", "content-type"],
+  },
   path: "/socket.io",
   pingTimeout: 25000,
   pingInterval: 20000,
@@ -74,27 +82,49 @@ io.use((socket, next) => {
 
     if (!token) return next(new Error("No token provided"));
     const decoded = jwt.verify(token, JWT_SECRET);
-    socket.user = { id: decoded.id, email: decoded.email, fullName: decoded.fullName };
+    socket.user = {
+      id: decoded.id,
+      email: decoded.email,
+      fullName: decoded.fullName,
+    };
     return next();
   } catch (_err) {
     return next(new Error("Invalid token"));
   }
 });
 
+// Handle socket connections
 io.on("connection", (socket) => {
   const uid = socket.user?.id;
   console.log(`🔌 Socket connected ${socket.id} (user: ${uid || "unknown"})`);
 
-  // Join personal user room (used by DMs)
-  if (uid) socket.join(uid);
+  if (uid) {
+    // Track presence
+    const wasOffline = !presence.isOnline(uid);
+    presence.connect(uid, socket.id);
 
-  // Back-compat: client calls socket.emit("join", userId)
+    if (wasOffline) {
+      io.emit("presence:update", { userId: uid, status: "online" });
+    }
+
+    // Join personal room for DMs
+    socket.join(uid);
+  }
+
+  // Back-compat: client can manually join a room
   socket.on("join", (userId) => {
     if (userId) socket.join(userId);
   });
 
-  socket.on("disconnect", (reason) => {
-    console.log(`❌ Socket disconnected ${socket.id} (${reason})`);
+  socket.on("disconnect", () => {
+    if (!uid) return;
+    const wasOnline = presence.isOnline(uid);
+    presence.disconnect(uid, socket.id);
+    const nowOnline = presence.isOnline(uid);
+    if (wasOnline && !nowOnline) {
+      io.emit("presence:update", { userId: uid, status: "offline" });
+    }
+    console.log(`❌ Socket disconnected ${socket.id}`);
   });
 });
 
@@ -125,10 +155,18 @@ process.on("uncaughtException", (err) => {
   console.error("🔥 UncaughtException:", err);
 });
 
+// Graceful shutdown
+const shutdown = () => {
+  console.log("🛑 Shutting down...");
+  server.close(() => process.exit(0));
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
 // ───────────────────────── Startup ─────────────────────────
 (async () => {
   try {
-    await connectDB(); // make sure db.js exports connectDB()
+    await connectDB();
     server.listen(PORT, () => {
       console.log(`✅ Server running on http://localhost:${PORT}`);
       console.log(`🔗 CORS origin: ${ORIGIN}`);

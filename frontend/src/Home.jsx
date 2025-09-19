@@ -160,47 +160,57 @@ export default function Home() {
   }, [dmMessages]);
 
   const selectCommunity = async (c) => {
-    if (!c?.id || isSwitchingCommunity) return;
-    setIsSwitchingCommunity(true);
-    setAccessNotice("");
-    setCurrentCommunity(c);
-    setCommunities((cs) => cs.map((x) => ({ ...x, active: x.id === c.id })));
+  if (!c?.id || isSwitchingCommunity) return;
+  setIsSwitchingCommunity(true);
+  setAccessNotice("");
+  setCurrentCommunity(c);
+  setCommunities((cs) => cs.map((x) => ({ ...x, active: x.id === c.id })));
 
-    try {
-      const [mr, mb] = await Promise.all([
-        axios.get(`${API}/api/messages/${c.id}`, { headers: authHeader() }),
-        axios.get(`${API}/api/members/${c.id}`, { headers: authHeader() }),
-      ]);
-      setMessages(Array.isArray(mr.data) ? mr.data : []);
-      setMembers(Array.isArray(mb.data) ? mb.data : []);
+  try {
+    const [mr, mb] = await Promise.all([
+      axios.get(`${API}/api/messages/${c.id}`, { headers: authHeader() }),
+      axios.get(`${API}/api/members/${c.id}`, { headers: authHeader() }),
+    ]);
 
-      setTimeout(() => {
-        const el = document.querySelector("[data-messages-container]");
-        el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-      }, 30);
-    } catch (e) {
-      // Gracefully show why it failed
-      if (axios.isAxiosError(e)) {
-        if (e.response?.status === 403) {
-          setAccessNotice(
-            "You don’t have access to this community’s messages. (If you’re in dev, set SKIP_DOMAIN_CHECK=true in the backend .env and restart the server.)"
-          );
-        } else if (e.response?.status === 401) {
-          setAccessNotice("Your session is invalid or expired. Please log in again.");
-        } else if (e.response?.data?.error) {
-          setAccessNotice(`Error: ${e.response.data.error}`);
-        } else {
-          setAccessNotice("Could not load messages/members for this community.");
-        }
+    // Messages: always array
+    setMessages(Array.isArray(mr.data) ? mr.data : []);
+
+    // Members: normalize shape
+    const memberItems = Array.isArray(mb.data?.items)
+      ? mb.data.items
+      : Array.isArray(mb.data)
+      ? mb.data
+      : [];
+    setMembers(memberItems);
+
+    // Auto-scroll to bottom
+    setTimeout(() => {
+      const el = document.querySelector("[data-messages-container]");
+      el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }, 30);
+  } catch (e) {
+    // Gracefully show why it failed
+    if (axios.isAxiosError(e)) {
+      if (e.response?.status === 403) {
+        setAccessNotice(
+          "You don’t have access to this community’s messages. (If you’re in dev, set SKIP_DOMAIN_CHECK=true in the backend .env and restart the server.)"
+        );
+      } else if (e.response?.status === 401) {
+        setAccessNotice("Your session is invalid or expired. Please log in again.");
+      } else if (e.response?.data?.error) {
+        setAccessNotice(`Error: ${e.response.data.error}`);
       } else {
         setAccessNotice("Could not load messages/members for this community.");
       }
-      setMessages([]);
-      setMembers([]);
-    } finally {
-      setIsSwitchingCommunity(false);
+    } else {
+      setAccessNotice("Could not load messages/members for this community.");
     }
-  };
+    setMessages([]);
+    setMembers([]);
+  } finally {
+    setIsSwitchingCommunity(false);
+  }
+};
 
   const handleNewCommunity = async () => {
     const name = prompt("Enter community name:");

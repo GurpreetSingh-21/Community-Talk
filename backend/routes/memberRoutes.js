@@ -1,5 +1,3 @@
-// backend/routes/memberRoutes.js
-
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
@@ -14,12 +12,10 @@ router.use(authenticate);
 
 /**
  * GET /api/members/:communityId
- * List members in a community (paginated).
+ * Returns a plain array of members for the selected community.
  * Query:
- *   ?q=term          (search by name/email)
- *   ?status=online|offline
- *   ?page=1&limit=50 (max 200)
- * Returns: { items, page, limit, total, pages }
+ *   ?q=term                (search by name/email)
+ *   ?status=online|offline (filter by presence)
  */
 router.get("/:communityId", async (req, res) => {
   try {
@@ -28,46 +24,66 @@ router.get("/:communityId", async (req, res) => {
       return res.status(400).json({ error: "Invalid communityId" });
     }
 
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
-    const skip = (page - 1) * limit;
     const q = (req.query.q || "").trim();
-    const status = (req.query.status || "").toLowerCase();
+    const statusFilter = (req.query.status || "").toLowerCase();
 
-    const filter = { community: communityId };
-    if (q) {
-      filter.$or = [
-        { fullName: { $regex: new RegExp(q, "i") } },
-        { email: { $regex: new RegExp(q, "i") } },
-      ];
-    }
-    if (["online", "offline"].includes(status)) {
-      filter.status = status;
-    }
+// 1) Find members for just this community and populate Person
+const membersRaw = await Member.find({ communityId })
+  .select("_id person name email status avatar communityId")
+  .populate({
+    path: "person",
+    model: "Person",
+    select: "_id fullName email avatar",
+  })
+  .sort({ name: 1, _id: 1 })
+  .lean();
 
-    const [items, total] = await Promise.all([
-      Member.find(filter)
-        .select("_id person fullName email status avatar community")
-        .sort({ fullName: 1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Member.countDocuments(filter),
-    ]);
+// 2) Build quick map for presence
+const onlineUsers = new Set(req.presence.listOnlineInCommunity(communityId));
 
-    const myId = String(req.user.id);
-    const enriched = items.map((m) => ({
-      ...m,
-      isYou: String(m.person) === myId,
-    }));
+// 3) Normalize member objects
+const normalized = membersRaw.map((m) => {
+  const p = m.person || null;
 
-    return res.json({
-      items: enriched,
-      page,
-      limit,
-      total,
-      pages: Math.ceil(total / limit) || 1,
-    });
+  const displayName =
+    (m.name || (p && p.fullName) || "").trim() ||
+    (m.email || (p && p.email) || "").trim() ||
+    "User";
+
+  const email = (m.email || (p && p.email) || "").trim() || undefined;
+  const avatar = m.avatar || (p && p.avatar) || "/default-avatar.png";
+
+  const personId = String(p?._id || m.person || "");
+  const isOnline = personId && onlineUsers.has(personId);
+  const liveStatus = isOnline ? "online" : "offline";
+
+  return {
+    _id: m._id,
+    person: personId || null,
+    community: m.communityId,
+    fullName: displayName,
+    email,
+    avatar,
+    status: liveStatus,
+    isYou: personId === String(req.user.id),
+  };
+});
+
+    // 4) Filter by presence if requested
+    const byPresence =
+      statusFilter === "online" || statusFilter === "offline"
+        ? normalized.filter((x) => x.status === statusFilter)
+        : normalized;
+
+    // 5) Filter by search term
+    const rx = q ? new RegExp(q, "i") : null;
+    const finalList = rx
+      ? byPresence.filter(
+          (x) => rx.test(x.fullName || "") || rx.test(x.email || "")
+        )
+      : byPresence;
+
+    return res.json(finalList);
   } catch (error) {
     console.error("GET /api/members/:communityId error:", error);
     return res.status(500).json({ error: "Server Error" });
@@ -78,7 +94,6 @@ router.get("/:communityId", async (req, res) => {
  * POST /api/members
  * Join (or upsert) the current user into a community.
  * Body: { communityId, name?, avatar? }
- * - Idempotent: if membership exists, returns it.
  */
 router.post("/", async (req, res) => {
   try {
@@ -87,37 +102,33 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Valid communityId is required" });
     }
 
-    // Ensure community exists
-    const community = await Community.findById(communityId).select("_id").lean();
+    const community = await Community.findById(communityId)
+      .select("_id")
+      .lean();
     if (!community) {
       return res.status(404).json({ error: "Community not found" });
     }
 
-    // Get current user
     const me = await Person.findById(req.user.id)
-      .select("_id fullName email")
+      .select("_id fullName email avatar")
       .lean();
     if (!me) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    // Upsert membership (one per person per community)
     const updated = await Member.findOneAndUpdate(
-      { person: me._id, community: communityId },
+      { person: me._id, communityId },
       {
-        $setOnInsert: {
-          person: me._id,
-          community: communityId,
-        },
+        $setOnInsert: { person: me._id, communityId },
         $set: {
-          fullName: (name || me.fullName || "").trim() || me.email,
+          name: (name || me.fullName || me.email || "User").trim(),
           email: me.email,
-          avatar: avatar || undefined,
+          avatar: avatar || me.avatar || "/default-avatar.png",
         },
       },
       { new: true, upsert: true }
     )
-      .select("_id person fullName email status avatar community")
+      .select("_id person name email status avatar communityId")
       .lean();
 
     return res.status(201).json(updated);
@@ -129,7 +140,7 @@ router.post("/", async (req, res) => {
 
 /**
  * PATCH /api/members/:memberId
- * Update your own membership record (name, avatar, status).
+ * Update your own membership record (name, avatar, optional manual status).
  * Body: { name?, avatar?, status? }
  */
 router.patch("/:memberId", async (req, res) => {
@@ -140,28 +151,29 @@ router.patch("/:memberId", async (req, res) => {
     }
 
     const { name, avatar, status } = req.body || {};
-    const allowed = {};
-    if (typeof name === "string") allowed.fullName = name.trim();
-    if (typeof avatar === "string") allowed.avatar = avatar.trim();
+    const $set = {};
+    if (typeof name === "string") $set.name = name.trim();
+    if (typeof avatar === "string") $set.avatar = avatar.trim();
     if (typeof status === "string" && ["online", "offline"].includes(status)) {
-      allowed.status = status;
+      $set.status = status;
     }
 
-    if (!Object.keys(allowed).length) {
+    if (!Object.keys($set).length) {
       return res.status(400).json({ error: "No valid fields to update" });
     }
 
-    // Ensure user can only update their own Member row
     const member = await Member.findOneAndUpdate(
       { _id: memberId, person: req.user.id },
-      { $set: allowed },
+      { $set },
       { new: true }
     )
-      .select("_id person fullName email status avatar community")
+      .select("_id person name email status avatar communityId")
       .lean();
 
     if (!member) {
-      return res.status(404).json({ error: "Member not found or not owned by you" });
+      return res
+        .status(404)
+        .json({ error: "Member not found or not owned by you" });
     }
 
     return res.json(member);
@@ -173,7 +185,7 @@ router.patch("/:memberId", async (req, res) => {
 
 /**
  * DELETE /api/members/:memberId
- * Remove a membership (self-remove). Admin logic could be added later.
+ * Remove your membership.
  */
 router.delete("/:memberId", async (req, res) => {
   try {
@@ -188,7 +200,9 @@ router.delete("/:memberId", async (req, res) => {
     }).lean();
 
     if (!removed) {
-      return res.status(404).json({ error: "Member not found or not owned by you" });
+      return res
+        .status(404)
+        .json({ error: "Member not found or not owned by you" });
     }
 
     return res.json({ message: "Member removed" });
